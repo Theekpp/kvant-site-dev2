@@ -226,34 +226,36 @@ export default function Dashboard() {
           <div className="h-[350px] w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }}
                   dy={10}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }}
                   allowDecimals={false}
                   domain={[0, yMax]}
                 />
                 <Tooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
+                  cursor={{ fill: 'rgba(0,0,0,0.04)' }}
                   contentStyle={{
                     borderRadius: '12px',
-                    border: '1px solid hsl(var(--border))',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-card)',
+                    color: 'var(--color-card-foreground)',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.08)'
                   }}
                   formatter={(value: any) => [value, 'Записей']}
                   labelFormatter={(label) => viewMode === "month" ? `Дни ${label}` : label}
                 />
                 <Bar
                   dataKey="count"
-                  fill="hsl(var(--primary))"
+                  fill="var(--color-primary)"
                   radius={[6, 6, 0, 0]}
                   barSize={viewMode === "week" ? 36 : 40}
                 />
