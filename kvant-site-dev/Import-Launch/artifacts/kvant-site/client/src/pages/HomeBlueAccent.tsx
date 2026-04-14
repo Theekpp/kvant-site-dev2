@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Rocket, Atom, Award, Telescope, ArrowRight, CheckCircle, Menu, X, Star, LogIn, Zap } from "lucide-react";
+import { Rocket, Atom, Award, Magnet, ArrowRight, CheckCircle, Menu, X, Star, LogIn, FlaskConical } from "lucide-react";
 import PricingCards from "@/components/PricingCards";
 import { BOT_URL } from "@/lib/bot";
 import { motion, AnimatePresence } from "framer-motion";
@@ -547,7 +547,7 @@ export default function HomeBlueAccent() {
               <div className="space-y-8">
                 <div className="flex gap-5">
                   <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[#4F46E5]/20 flex items-center justify-center text-indigo-400">
-                    <Atom className="w-6 h-6" />
+                    <FlaskConical className="w-6 h-6" />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-xl font-bold mb-3">Мой подход</h4>
@@ -574,7 +574,7 @@ export default function HomeBlueAccent() {
 
                 <div className="flex gap-5">
                   <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400">
-                    <Zap className="w-6 h-6" />
+                    <Atom className="w-6 h-6" />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-xl font-bold mb-3">Мой опыт</h4>
@@ -605,7 +605,7 @@ export default function HomeBlueAccent() {
 
                 <div className="flex gap-5">
                   <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-slate-800/20 flex items-center justify-center text-purple-400">
-                    <Telescope className="w-6 h-6" />
+                    <Magnet className="w-6 h-6" />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-xl font-bold mb-3">Для кого мои занятия</h4>
