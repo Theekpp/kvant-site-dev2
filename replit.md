@@ -1,0 +1,42 @@
+# Физика с Кириллом — Physics Tutor Website
+
+## Project Structure
+
+This is a pnpm monorepo located at `kvant-site-dev/Import-Launch/`.
+
+The main application is at `kvant-site-dev/Import-Launch/artifacts/kvant-site/`.
+
+## Tech Stack
+
+- **Frontend**: React 19 + TypeScript + Vite (served via Express in dev)
+- **Backend**: Express.js v5 + TypeScript (tsx)
+- **Database**: PostgreSQL (Replit-managed), Drizzle ORM
+- **Auth**: JWT access tokens + refresh tokens (httpOnly cookies), Passport.js
+- **Styling**: Tailwind CSS v4
+
+## Running the App
+
+The workflow runs: `cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm run dev`
+
+- Dev server listens on port 5000 (combined frontend + backend)
+- Host: 0.0.0.0, allowedHosts: true (Replit proxy compatible)
+
+## Deployment
+
+- Build: `cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm run build`
+- Run: `cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm run start`
+- Target: autoscale
+
+## Key Environment Variables
+
+- `DATABASE_URL` — PostgreSQL connection string (set by Replit)
+- `JWT_ACCESS_SECRET` — JWT access token secret
+- `JWT_REFRESH_SECRET` — JWT refresh token secret
+- `RESEND_API_KEY` — Resend email API key (optional)
+- `FROM_EMAIL` — Sender email address
+- `FRONTEND_URL` — Full app URL for email links
+
+## Admin Panel
+
+Access at `/admin`. Requires account with `role = 'admin'` in `accounts` table.
+Set via SQL: `UPDATE accounts SET role='admin' WHERE email='your@email.com';`
