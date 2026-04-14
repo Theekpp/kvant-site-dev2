@@ -646,6 +646,7 @@ const plans = [
     buttonText: "Оформить", gradient: "from-emerald-500 to-teal-600", featured: false,
     Icon: TrajectoryIcon, accentColor: "text-emerald-600", badgeColor: "bg-emerald-100 text-emerald-700",
     botLink: botLink("sub4"), subType: "individual", lessons: 4,
+    cardBg: "bg-emerald-50", checkCircle: "#d1fae5", checkMark: "#059669",
   },
   {
     id: "max", animType: "rocket" as AnimType,
@@ -666,6 +667,7 @@ const plans = [
     buttonText: "Записаться", gradient: "from-violet-500 to-purple-600", featured: false,
     Icon: MagnetIcon, accentColor: "text-violet-600", badgeColor: "bg-violet-100 text-violet-700",
     botLink: botLink("group"), subType: "group", lessons: 1,
+    cardBg: "bg-amber-50", checkCircle: "#fef3c7", checkMark: "#d97706",
   },
 ];
 
@@ -765,7 +767,7 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
       className={`relative rounded-2xl p-6 cursor-pointer flex flex-col pc-card-lift ${
         isFeatured
           ? "bg-gradient-to-br from-indigo-600 to-blue-700 shadow-2xl"
-          : "bg-white shadow-lg"
+          : `${"cardBg" in plan && plan.cardBg ? plan.cardBg : "bg-white"} shadow-lg`
       }`}
       style={isFeatured ? { boxShadow: "0 20px 60px rgba(79,70,229,0.4)" } : {}}
       onMouseEnter={() => setHovered(true)}
@@ -811,8 +813,8 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
         {plan.features.map((f) => (
           <li key={f} className="flex items-center gap-2 text-xs">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="7" fill={isFeatured ? "rgba(255,255,255,0.2)" : "#ede9fe"} />
-              <path d="M4 7 L6.5 9.5 L10 5" stroke={isFeatured ? "white" : "#7c3aed"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="7" cy="7" r="7" fill={isFeatured ? "rgba(255,255,255,0.2)" : ("checkCircle" in plan && plan.checkCircle ? plan.checkCircle : "#ede9fe")} />
+              <path d="M4 7 L6.5 9.5 L10 5" stroke={isFeatured ? "white" : ("checkMark" in plan && plan.checkMark ? plan.checkMark : "#7c3aed")} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span className={isFeatured ? "text-blue-50" : "text-slate-600"}>{f}</span>
           </li>
@@ -880,7 +882,7 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
       `}</style>
 
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl w-full">
           {plans.map((plan) => (
             <PricingCard key={plan.id} plan={plan} isLoggedIn={isLoggedIn} />
           ))}
