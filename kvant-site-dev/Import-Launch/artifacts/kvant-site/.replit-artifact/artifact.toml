@@ -1,0 +1,11 @@
+kind = "web"
+previewPath = "/"
+title = "Физика с Кириллом"
+
+[[services]]
+localPort = 5000
+name = "web"
+paths = ["/"]
+
+[services.development]
+#run = "cd /home/runner/workspace/artifacts/kvant-site && NODE_ENV=development node --import tsx/esm server/index.ts"
