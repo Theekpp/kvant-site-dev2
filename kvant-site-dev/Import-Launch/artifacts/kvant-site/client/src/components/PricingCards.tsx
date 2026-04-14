@@ -882,7 +882,10 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
       `}</style>
 
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl w-full">
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full"
+          style={{ gap: 'clamp(16px, calc(1.5vw + 8px), 40px)', maxWidth: 'min(calc(100vw - 64px), 1600px)' }}
+        >
           {plans.map((plan) => (
             <PricingCard key={plan.id} plan={plan} isLoggedIn={isLoggedIn} />
           ))}

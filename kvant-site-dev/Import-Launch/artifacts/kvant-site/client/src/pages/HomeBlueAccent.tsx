@@ -76,19 +76,33 @@ export default function HomeBlueAccent() {
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="container mx-auto px-4 h-20 xl:h-24 flex items-center justify-between max-w-7xl">
+        <div
+          className="container mx-auto px-4 flex items-center justify-between max-w-7xl"
+          style={{ height: 'clamp(80px, calc(2.9vw + 57px), 112px)' }}
+        >
           <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
-            <img src={kvantLogo} alt="K" className="w-10 h-10 xl:w-12 xl:h-12 object-contain" />
-            <span className="font-display font-bold text-2xl xl:text-3xl text-slate-800 -ml-0.5">vant</span>
+            <img
+              src={kvantLogo}
+              alt="K"
+              className="object-contain"
+              style={{ width: 'clamp(40px, calc(1.5vw + 28px), 56px)', height: 'clamp(40px, calc(1.5vw + 28px), 56px)' }}
+            />
+            <span
+              className="font-display font-bold text-slate-800 -ml-0.5"
+              style={{ fontSize: 'clamp(1.5rem, calc(1vw + 1rem), 2.25rem)' }}
+            >vant</span>
           </div>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6 lg:gap-8 mr-4 text-slate-600">
-            <button onClick={() => window.scrollTo(0, 0)} className="text-sm xl:text-base font-medium hover:text-[#4F46E5] transition-colors">Главная</button>
-            <button onClick={() => scrollToSection('about')} className="text-sm xl:text-base font-medium hover:text-[#4F46E5] transition-colors">О репетиторе</button>
-            <button onClick={() => scrollToSection('reviews')} className="text-sm xl:text-base font-medium hover:text-[#4F46E5] transition-colors">Отзывы</button>
-            <button onClick={() => scrollToSection('services')} className="text-sm xl:text-base font-medium hover:text-[#4F46E5] transition-colors">Услуги</button>
-            <button onClick={() => scrollToSection('contact')} className="text-sm xl:text-base font-medium hover:text-[#4F46E5] transition-colors">Контакты</button>
+          <div
+            className="hidden md:flex items-center mr-4 text-slate-600"
+            style={{ gap: 'clamp(24px, calc(2.1vw + 7px), 48px)', fontSize: 'clamp(0.875rem, calc(0.5vw + 0.625rem), 1.25rem)' }}
+          >
+            <button onClick={() => window.scrollTo(0, 0)} className="font-medium hover:text-[#4F46E5] transition-colors">Главная</button>
+            <button onClick={() => scrollToSection('about')} className="font-medium hover:text-[#4F46E5] transition-colors">О репетиторе</button>
+            <button onClick={() => scrollToSection('reviews')} className="font-medium hover:text-[#4F46E5] transition-colors">Отзывы</button>
+            <button onClick={() => scrollToSection('services')} className="font-medium hover:text-[#4F46E5] transition-colors">Услуги</button>
+            <button onClick={() => scrollToSection('contact')} className="font-medium hover:text-[#4F46E5] transition-colors">Контакты</button>
           </div>
 
           <div className="hidden md:flex items-center gap-2">
