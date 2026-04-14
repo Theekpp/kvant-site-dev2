@@ -530,7 +530,7 @@ export default function HomeBlueAccent() {
               {/* Intro Text */}
               <div>
                 <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-6 leading-tight text-slate-900">
-                  Помогаю <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F46E5] to-[#06B6D4]">понять физику</span>, а не просто заучить формулы.
+                  Помогаю <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F46E5] to-[#06B6D4]">понять суть явлений</span>, а не просто заучить формулы.
                 </h3>
                 <p className="text-lg text-slate-600 leading-loose">
                   Меня зовут Кирилл, я студент и преподаватель физики. Учусь в техническом направлении и параллельно уже несколько лет помогаю школьникам разобраться в предмете.
