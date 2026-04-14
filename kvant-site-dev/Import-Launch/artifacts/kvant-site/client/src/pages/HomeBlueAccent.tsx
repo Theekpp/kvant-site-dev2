@@ -507,12 +507,20 @@ export default function HomeBlueAccent() {
               {/* Quick Stats */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm">
-                  <div className="text-3xl font-bold text-[#4F46E5] mb-1">5+</div>
-                  <div className="text-sm text-slate-600">Лет опыта</div>
+                  <div className="text-3xl font-bold text-[#4F46E5] mb-1">200+</div>
+                  <div className="text-sm text-slate-600">Учеников</div>
                 </div>
                 <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-purple-50 hover:border-purple-200 transition-colors shadow-sm">
-                  <div className="text-3xl font-bold text-[#4F46E5] mb-1">100+</div>
-                  <div className="text-sm text-slate-600">Учеников</div>
+                  <div className="text-2xl font-bold text-[#4F46E5] mb-1">7–11</div>
+                  <div className="text-sm text-slate-600">Классы</div>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-cyan-50 hover:border-cyan-200 transition-colors shadow-sm">
+                  <div className="text-xl font-bold text-[#4F46E5] mb-1 leading-tight">ОГЭ / Олимпиады</div>
+                  <div className="text-sm text-slate-600">Подготовка</div>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-sm">
+                  <div className="text-xl font-bold text-[#4F46E5] mb-1 leading-tight">Инд. подход</div>
+                  <div className="text-sm text-slate-600">К каждому</div>
                 </div>
               </div>
             </div>
@@ -522,10 +530,16 @@ export default function HomeBlueAccent() {
               {/* Intro Text */}
               <div>
                 <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-6 leading-tight text-slate-900">
-                  Помогаю <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F46E5] to-[#06B6D4]">понять суть явлений</span>, а не просто заучить формулы.
+                  Помогаю <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F46E5] to-[#06B6D4]">понять физику</span>, а не просто заучить формулы.
                 </h3>
                 <p className="text-lg text-slate-600 leading-loose">
-                  Я — победитель международных олимпиад и ментор по физике. Моя цель — показать, что физика — это не скучный школьный предмет, а ключ к пониманию того, как устроен наш мир. Специализируюсь на углубленном изучении предмета для тех, кто хочет выйти за рамки школьной программы.
+                  Меня зовут Кирилл, я студент и преподаватель физики. Учусь в техническом направлении и параллельно уже несколько лет помогаю школьникам разобраться в предмете.
+                </p>
+                <p className="text-lg text-slate-600 leading-loose mt-4">
+                  Через меня прошло 200+ учеников, и я точно знаю, с какими трудностями они сталкиваются — от полного непонимания тем до страха перед экзаменами.
+                </p>
+                <p className="text-lg text-slate-600 leading-loose mt-4">
+                  Физика для меня — это не просто предмет, а способ мышления. И именно этому я стараюсь учить своих учеников: не заучивать, а понимать.
                 </p>
               </div>
 
@@ -537,8 +551,23 @@ export default function HomeBlueAccent() {
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-xl font-bold mb-3">Мой подход</h4>
-                    <p className="text-slate-400 leading-loose">
-                      Мы не гонимся за баллами, а строим фундамент знаний. Я объясняю сложные концепции через логику и эксперименты, развивая физическое мышление, которое останется с вами на всю жизнь.
+                    <p className="text-slate-500 leading-loose mb-3">На занятиях ученик:</p>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 flex-shrink-0"></span>
+                        начинает понимать темы, которые раньше казались сложными
+                      </li>
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 flex-shrink-0"></span>
+                        учится логически мыслить, а не заучивать формулы
+                      </li>
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 flex-shrink-0"></span>
+                        разбирает задачи до полного понимания, а не «по образцу»
+                      </li>
+                    </ul>
+                    <p className="text-slate-400 leading-loose mt-3">
+                      Каждое занятие — это индивидуальный подход, даже в группах. Я подстраиваюсь под уровень ученика и веду его до результата.
                     </p>
                   </div>
                 </div>
@@ -550,8 +579,27 @@ export default function HomeBlueAccent() {
                   <div className="min-w-0">
                     <h4 className="text-xl font-bold mb-3">Мой опыт</h4>
                     <p className="text-slate-400 leading-loose">
-                      Победитель различных физических и математических олимпиад. Знаю, как разжечь интерес к науке и помочь ученику поверить в свои силы, разбирая даже самые запутанные темы простым языком.
+                      Физика для меня — это не просто школьный предмет. Я сам проходил путь от непонимания сложных тем до глубокого погружения: участвовал в олимпиадах, разбирал задачи, которые сначала казались невозможными, и со временем начал видеть в физике логику и систему.
                     </p>
+                    <p className="text-slate-500 leading-loose mt-3 font-medium">За время преподавания:</p>
+                    <ul className="space-y-2 mt-2">
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-2 flex-shrink-0"></span>
+                        ученики поднимаются с 2–3 до 4–5
+                      </li>
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-2 flex-shrink-0"></span>
+                        уверенно сдают ОГЭ по физике
+                      </li>
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-2 flex-shrink-0"></span>
+                        начинают сами решать задачи, а не списывать
+                      </li>
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-2 flex-shrink-0"></span>
+                        появляется интерес к предмету и уверенность в себе
+                      </li>
+                    </ul>
                   </div>
                 </div>
 
@@ -562,17 +610,21 @@ export default function HomeBlueAccent() {
                   <div className="min-w-0">
                     <h4 className="text-xl font-bold mb-3">Для кого мои занятия</h4>
                     <ul className="space-y-3 mt-2">
-                      <li className="flex items-center gap-3 text-slate-400">
-                        <span className="w-1.5 h-1.5 rounded-2xl bg-purple-400"></span>
-                        Тех, кто хочет знать физику глубже школьной программы
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-2 flex-shrink-0"></span>
+                        Ученики 7–11 классов, которые хотят поднять оценки
                       </li>
-                      <li className="flex items-center gap-3 text-slate-400">
-                        <span className="w-1.5 h-1.5 rounded-2xl bg-purple-400"></span>
-                        Учеников 6-8 классов, интересующихся наукой
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-2 flex-shrink-0"></span>
+                        Те, кто готовится к ОГЭ по физике
                       </li>
-                      <li className="flex items-center gap-3 text-slate-400">
-                        <span className="w-1.5 h-1.5 rounded-2xl bg-purple-400"></span>
-                        Школьников, желающих устранить пробелы в понимании
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-2 flex-shrink-0"></span>
+                        Ученики, которым нужна помощь с пониманием тем
+                      </li>
+                      <li className="flex items-start gap-3 text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-2 flex-shrink-0"></span>
+                        Те, кто хочет идти дальше школы (олимпиады, углубление)
                       </li>
                     </ul>
                   </div>
