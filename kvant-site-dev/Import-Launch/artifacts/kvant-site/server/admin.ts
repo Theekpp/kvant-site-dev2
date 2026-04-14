@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { db } from "./db";
-import { users, accounts, bookings, subscriptions, scheduleSlots } from "@shared/schema";
+import { users, accounts, bookings, subscriptions, scheduleSlots, reviews } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "./auth";
 
@@ -220,6 +220,71 @@ export function registerAdminRoutes(app: Express) {
     try {
       const id = Number(req.params.id);
       await db.delete(scheduleSlots).where(eq(scheduleSlots.id, id));
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.get("/api/reviews", async (_req, res) => {
+    try {
+      const all = await db.select().from(reviews)
+        .where(eq(reviews.isVisible, true))
+        .orderBy(desc(reviews.id));
+      res.json(all);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.get("/api/admin/reviews", ...guard, async (_req, res) => {
+    try {
+      const all = await db.select().from(reviews).orderBy(desc(reviews.id));
+      res.json(all);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/admin/reviews", ...guard, async (req, res) => {
+    try {
+      const { name, date, subject, rating, text, isVisible } = req.body;
+      const [review] = await db.insert(reviews).values({
+        name,
+        date,
+        subject: subject ?? "Физика",
+        rating: rating ?? 5,
+        text,
+        isVisible: isVisible ?? true,
+      }).returning();
+      res.json(review);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.patch("/api/admin/reviews/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { name, date, subject, rating, text, isVisible } = req.body;
+      const updates: Record<string, any> = {};
+      if (name !== undefined) updates.name = name;
+      if (date !== undefined) updates.date = date;
+      if (subject !== undefined) updates.subject = subject;
+      if (rating !== undefined) updates.rating = rating;
+      if (text !== undefined) updates.text = text;
+      if (isVisible !== undefined) updates.isVisible = isVisible;
+      const [updated] = await db.update(reviews).set(updates).where(eq(reviews.id, id)).returning();
+      res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.delete("/api/admin/reviews/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await db.delete(reviews).where(eq(reviews.id, id));
       res.json({ success: true });
     } catch {
       res.status(500).json({ message: "Ошибка сервера" });

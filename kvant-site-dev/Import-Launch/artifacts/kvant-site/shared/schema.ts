@@ -78,8 +78,20 @@ export const scheduleSlots = pgTable("schedule_slots", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  date: text("date").notNull(),
+  subject: text("subject").notNull().default("Физика"),
+  rating: integer("rating").notNull().default(5),
+  text: text("text").notNull(),
+  isVisible: boolean("is_visible").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type ScheduleSlot = typeof scheduleSlots.$inferSelect;
+export type Review = typeof reviews.$inferSelect;
