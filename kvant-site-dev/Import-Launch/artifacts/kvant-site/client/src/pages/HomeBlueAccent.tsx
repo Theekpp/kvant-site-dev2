@@ -519,7 +519,7 @@ export default function HomeBlueAccent() {
                   <div className="text-sm text-slate-600">Подготовка</div>
                 </div>
                 <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-sm">
-                  <div className="text-xl font-bold text-[#4F46E5] mb-1 leading-tight">Инд. подход</div>
+                  <div className="text-base font-bold text-[#4F46E5] mb-1 leading-tight">Индивидуальный подход</div>
                   <div className="text-sm text-slate-600">К каждому</div>
                 </div>
               </div>
