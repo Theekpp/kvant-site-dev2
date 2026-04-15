@@ -49,4 +49,6 @@ build = ["bash", "-c", "cd kvant-site-dev/Import-Launch/artifacts/kvant-site && 
 [userenv]
 
 [userenv.shared]
+
+[userenv.development]
 FRONTEND_URL = "https://ea9ca581-63ae-4b94-ae0d-5c52f2d7440e-00-1id0fw0mrzove.riker.replit.dev"
