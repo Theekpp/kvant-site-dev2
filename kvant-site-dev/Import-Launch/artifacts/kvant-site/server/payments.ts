@@ -99,6 +99,7 @@ export function registerPaymentRoutes(app: Express) {
           subscriptionId: String(subscriptionId),
           accountId: String(account.id),
         },
+        notification_url: `${FRONTEND_URL}/api/yookassa/webhook`,
       }, idempotenceKey);
 
       await db.insert(payments).values({
@@ -159,6 +160,57 @@ export function registerPaymentRoutes(app: Express) {
     } catch (e: any) {
       console.error("[payments] Webhook error:", e?.message || e);
       return res.status(500).json({ message: "Ошибка обработки webhook" });
+    }
+  });
+
+  app.post("/api/cabinet/check-payment/:subscriptionId", requireAuth, async (req, res) => {
+    const subscriptionId = parseInt(req.params.subscriptionId);
+    if (isNaN(subscriptionId)) {
+      return res.status(400).json({ message: "Неверный ID абонемента" });
+    }
+
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account) return res.status(404).json({ message: "Аккаунт не найден" });
+
+      const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId));
+      if (!sub) return res.status(404).json({ message: "Абонемент не найден" });
+      if (sub.userId !== account.userId) return res.status(403).json({ message: "Нет доступа" });
+
+      if (sub.isPaid) {
+        return res.json({ isPaid: true });
+      }
+
+      if (!isConfigured()) {
+        return res.json({ isPaid: false });
+      }
+
+      const [payment] = await db.select().from(payments)
+        .where(eq(payments.subscriptionId, subscriptionId));
+
+      if (!payment) {
+        return res.json({ isPaid: false });
+      }
+
+      const ykPayment = await yookassaRequest("GET", `/payments/${payment.yookassaPaymentId}`);
+      const status: string = ykPayment.status;
+
+      await db.update(payments)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(payments.yookassaPaymentId, payment.yookassaPaymentId));
+
+      if (status === "succeeded") {
+        await db.update(subscriptions)
+          .set({ isPaid: true })
+          .where(eq(subscriptions.id, subscriptionId));
+        console.log(`[payments] Subscription ${subscriptionId} marked as paid via status check`);
+        return res.json({ isPaid: true });
+      }
+
+      return res.json({ isPaid: false, status });
+    } catch (e: any) {
+      console.error("[payments] Error checking payment status:", e?.message || e);
+      return res.status(500).json({ message: "Ошибка проверки статуса платежа" });
     }
   });
 

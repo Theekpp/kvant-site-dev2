@@ -130,14 +130,10 @@ export default function Cabinet() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success") {
-      setPaymentSuccess(true);
-      setActiveTab("subscriptions");
-      window.history.replaceState({}, "", "/cabinet");
-      setTimeout(() => setPaymentSuccess(false), 6000);
-    }
+    const paymentParam = params.get("payment");
+    const subIdParam = params.get("sub");
 
-    Promise.all([
+    const loadData = () => Promise.all([
       api.get("/api/cabinet/me"),
       api.get("/api/cabinet/bookings"),
       api.get("/api/cabinet/subscriptions"),
@@ -148,7 +144,32 @@ export default function Cabinet() {
       setBookings(bk.data);
       setSubscriptions(sub.data);
       setSlots(Array.isArray(sc.data) ? sc.data : []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    });
+
+    if (paymentParam === "success" && subIdParam) {
+      setActiveTab("subscriptions");
+      window.history.replaceState({}, "", "/cabinet");
+
+      loadData().finally(() => {
+        setLoading(false);
+        api.post(`/api/cabinet/check-payment/${subIdParam}`, {})
+          .then((r) => {
+            if (r.data.isPaid) {
+              setSubscriptions(prev =>
+                prev.map(s => s.id === Number(subIdParam) ? { ...s, isPaid: true } : s)
+              );
+            }
+            setPaymentSuccess(true);
+            setTimeout(() => setPaymentSuccess(false), 6000);
+          })
+          .catch(() => {
+            setPaymentSuccess(true);
+            setTimeout(() => setPaymentSuccess(false), 6000);
+          });
+      });
+    } else {
+      loadData().catch(() => {}).finally(() => setLoading(false));
+    }
   }, []);
 
   const handlePaySubscription = async (subId: number) => {
