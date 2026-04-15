@@ -125,8 +125,18 @@ export default function Cabinet() {
   const [bookingDate, setBookingDate] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState<number | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success") {
+      setPaymentSuccess(true);
+      setActiveTab("subscriptions");
+      window.history.replaceState({}, "", "/cabinet");
+      setTimeout(() => setPaymentSuccess(false), 6000);
+    }
+
     Promise.all([
       api.get("/api/cabinet/me"),
       api.get("/api/cabinet/bookings"),
@@ -140,6 +150,21 @@ export default function Cabinet() {
       setSlots(Array.isArray(sc.data) ? sc.data : []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  const handlePaySubscription = async (subId: number) => {
+    setPaymentLoading(subId);
+    try {
+      const r = await api.post(`/api/cabinet/pay/${subId}`, {});
+      if (r.data.confirmationUrl) {
+        window.location.href = r.data.confirmationUrl;
+      } else {
+        alert("Не удалось получить ссылку для оплаты. Попробуйте позже.");
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Ошибка при создании платежа");
+      setPaymentLoading(null);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -276,13 +301,24 @@ export default function Cabinet() {
           ))}
         </div>
 
-        {/* Success Banner */}
+        {/* Success Banners */}
         {bookingSuccess && (
           <div className="mb-4 bg-green-50 border border-green-200 rounded-2xl px-5 py-3 flex items-center gap-3">
             <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <p className="text-green-800 text-sm font-medium">Занятие успешно забронировано!</p>
+          </div>
+        )}
+        {paymentSuccess && (
+          <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 flex items-center gap-3">
+            <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-emerald-800 text-sm font-semibold">Платёж успешно проведён!</p>
+              <p className="text-emerald-700 text-xs mt-0.5">Абонемент активирован. Статус обновится в течение нескольких минут.</p>
+            </div>
           </div>
         )}
 
@@ -454,6 +490,30 @@ export default function Cabinet() {
                           />
                         </div>
                       </div>
+                      {!sub.isPaid && (
+                        <button
+                          onClick={() => handlePaySubscription(sub.id)}
+                          disabled={paymentLoading === sub.id}
+                          className="mt-4 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {paymentLoading === sub.id ? (
+                            <>
+                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Переход к оплате...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                              </svg>
+                              Оплатить через ЮКассу
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
