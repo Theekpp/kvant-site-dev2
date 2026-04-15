@@ -739,16 +739,30 @@ export default function HomeBlueAccent() {
             </Button>
           </a>
           
-          <div className="mt-20 pt-10 border-t border-slate-800 text-sm text-slate-400 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-1.5">
-              <img src={kvantLogo} alt="K" className="w-6 h-6 object-contain opacity-80" />
-              <span className="font-display font-bold text-slate-200">vant</span>
+          <div className="mt-20 pt-10 border-t border-slate-800 text-sm text-slate-400 space-y-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-1.5">
+                <img src={kvantLogo} alt="K" className="w-6 h-6 object-contain opacity-80" />
+                <span className="font-display font-bold text-slate-200">vant</span>
+              </div>
+              <div>© {new Date().getFullYear()} Kvant. Все права защищены.</div>
+              <div className="flex gap-4">
+                <a href="#" className="hover:text-white transition-colors">Telegram</a>
+                <a href="#" className="hover:text-white transition-colors">WhatsApp</a>
+                <a href="#" className="hover:text-white transition-colors">ВКонтакте</a>
+              </div>
             </div>
-            <div>© {new Date().getFullYear()} Kvant. Все права защищены.</div>
-            <div className="flex gap-4">
-              <a href="#" className="hover:text-white transition-colors">Telegram</a>
-              <a href="#" className="hover:text-white transition-colors">WhatsApp</a>
-              <a href="#" className="hover:text-white transition-colors">ВКонтакте</a>
+
+            <div className="border-t border-slate-800/60 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <p className="text-slate-500 text-xs text-center md:text-left">
+                [ФИО] · ИНН [ИНН] · Самозанятый
+              </p>
+              <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs">
+                <a href="/offer" className="hover:text-white transition-colors">Публичная оферта</a>
+                <a href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</a>
+                <a href="/terms" className="hover:text-white transition-colors">Пользовательское соглашение</a>
+                <a href="/refund" className="hover:text-white transition-colors">Условия возврата</a>
+              </div>
             </div>
           </div>
         </div>

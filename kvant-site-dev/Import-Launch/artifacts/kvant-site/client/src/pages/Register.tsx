@@ -11,6 +11,7 @@ const schema = z.object({
   phone: z.string().optional(),
   password: z.string().min(8, "Минимум 8 символов"),
   confirmPassword: z.string(),
+  consent: z.boolean().refine(v => v === true, "Необходимо дать согласие"),
 }).refine((d) => d.password === d.confirmPassword, {
   message: "Пароли не совпадают",
   path: ["confirmPassword"],
@@ -24,6 +25,7 @@ export default function Register() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { consent: false },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -131,6 +133,29 @@ export default function Register() {
                 className="w-full px-4 py-2.5 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition"
               />
               {errors.confirmPassword && <p className="text-destructive text-xs mt-1">{errors.confirmPassword.message}</p>}
+            </div>
+
+            <div className="pt-1">
+              <label className={`flex items-start gap-3 cursor-pointer group ${errors.consent ? "text-destructive" : ""}`}>
+                <input
+                  {...register("consent")}
+                  type="checkbox"
+                  className="mt-0.5 w-4 h-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
+                />
+                <span className="text-sm text-muted-foreground leading-snug group-hover:text-foreground transition-colors">
+                  Я согласен с обработкой персональных данных в соответствии с{" "}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline font-medium"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    Политикой конфиденциальности
+                  </a>
+                </span>
+              </label>
+              {errors.consent && <p className="text-destructive text-xs mt-1 ml-7">{errors.consent.message}</p>}
             </div>
 
             {serverError && (

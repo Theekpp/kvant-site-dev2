@@ -40,3 +40,19 @@ The workflow runs: `cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm
 
 Access at `/admin`. Requires account with `role = 'admin'` in `accounts` table.
 Set via SQL: `UPDATE accounts SET role='admin' WHERE email='your@email.com';`
+
+## Legal Pages
+
+- `/offer` — Публичная оферта
+- `/privacy` — Политика конфиденциальности
+- `/terms` — Пользовательское соглашение
+- `/refund` — Условия возврата
+
+Placeholders `[ФИО]` and `[ИНН]` in legal docs must be replaced with real data before going to production.
+
+## Legal / Compliance Features
+
+- **Cookie banner** — slides in from bottom on first visit; stored in `localStorage("cookies_accepted")`
+- **Consent checkbox** on `/register` page (required, validated via zod)
+- **Consent checkbox** in PricingCards cart bar (required before adding plans or proceeding to checkout)
+- **Footer** — includes реквизиты (`[ФИО] · ИНН [ИНН] · Самозанятый`) and links to all 4 legal pages
