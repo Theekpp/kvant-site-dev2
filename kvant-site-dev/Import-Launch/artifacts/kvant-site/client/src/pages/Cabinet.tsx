@@ -138,8 +138,16 @@ export default function Cabinet() {
 
   const [orderCart, setOrderCart] = useState<Record<string, number>>({});
   const [orderLoading, setOrderLoading] = useState(false);
+  const [payAllLoading, setPayAllLoading] = useState(false);
 
   const totalOrderItems = Object.values(orderCart).reduce((a, b) => a + b, 0);
+
+  const totalOrderPrice = Object.entries(orderCart).reduce((sum, [planId, qty]) => {
+    const plan = CABINET_PLANS.find(p => p.id === planId);
+    if (!plan) return sum;
+    const raw = plan.price.replace(/\s/g, "").replace("₽", "");
+    return sum + (parseInt(raw) || 0) * qty;
+  }, 0);
 
   const addPlan = (id: string) => setOrderCart(c => ({ ...c, [id]: (c[id] || 0) + 1 }));
   const removePlan = (id: string) => setOrderCart(c => {
@@ -151,14 +159,29 @@ export default function Cabinet() {
   const handleOrderCheckout = async () => {
     setOrderLoading(true);
     try {
+      const newSubIds: number[] = [];
       for (const [planId, qty] of Object.entries(orderCart)) {
         const plan = CABINET_PLANS.find(p => p.id === planId);
         if (!plan) continue;
         for (let i = 0; i < qty; i++) {
-          await api.post("/api/cabinet/subscriptions", { type: plan.subType, totalLessons: plan.lessons });
+          const r = await api.post("/api/cabinet/subscriptions", { type: plan.subType, totalLessons: plan.lessons });
+          newSubIds.push(r.data.id);
         }
       }
-      const [sub] = await Promise.all([api.get("/api/cabinet/subscriptions")]);
+
+      try {
+        const payRes = await api.post("/api/cabinet/pay-cart", { subscriptionIds: newSubIds });
+        if (payRes.data.confirmationUrl) {
+          window.location.href = payRes.data.confirmationUrl;
+          return;
+        }
+      } catch (payErr: any) {
+        if (payErr.response?.status !== 503) {
+          throw payErr;
+        }
+      }
+
+      const sub = await api.get("/api/cabinet/subscriptions");
       setSubscriptions(sub.data);
       setOrderCart({});
       setActiveTab("subscriptions");
@@ -169,10 +192,25 @@ export default function Cabinet() {
     }
   };
 
+  const handlePayAll = async (unpaidSubs: Subscription[]) => {
+    setPayAllLoading(true);
+    try {
+      const r = await api.post("/api/cabinet/pay-cart", { subscriptionIds: unpaidSubs.map(s => s.id) });
+      if (r.data.confirmationUrl) {
+        window.location.href = r.data.confirmationUrl;
+      } else {
+        alert("Не удалось получить ссылку для оплаты. Попробуйте позже.");
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Ошибка при создании платежа");
+    } finally {
+      setPayAllLoading(false);
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentParam = params.get("payment");
-    const subIdParam = params.get("sub");
 
     const checkUnpaidSubscriptions = (subs: Subscription[]) => {
       const unpaid = subs.filter(s => !s.isPaid);
@@ -204,11 +242,21 @@ export default function Cabinet() {
       checkUnpaidSubscriptions(sub.data);
     });
 
-    if (paymentParam === "success" && subIdParam) {
+    if (paymentParam === "success") {
       setActiveTab("subscriptions");
       window.history.replaceState({}, "", "/cabinet");
       setPaymentSuccess(true);
       setTimeout(() => setPaymentSuccess(false), 6000);
+    }
+
+    const savedCart = localStorage.getItem("pricing_cart");
+    if (savedCart) {
+      try {
+        const parsed = JSON.parse(savedCart);
+        setOrderCart(parsed);
+        setActiveTab("order");
+        localStorage.removeItem("pricing_cart");
+      } catch {}
     }
 
     loadData().catch(() => {}).finally(() => setLoading(false));
@@ -513,6 +561,46 @@ export default function Cabinet() {
               </button>
             </div>
 
+            {subscriptions.filter(s => !s.isPaid).length > 1 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-900 text-sm">
+                      {subscriptions.filter(s => !s.isPaid).length} абонемента ожидают оплаты
+                    </p>
+                    <p className="text-xs text-amber-700">Оплатите все сразу одним платежом</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handlePayAll(subscriptions.filter(s => !s.isPaid))}
+                  disabled={payAllLoading}
+                  className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-semibold py-2.5 px-5 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {payAllLoading ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Переход...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      Оплатить все сразу
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
             {subscriptions.length === 0 ? (
               <div className="bg-white rounded-2xl border border-dashed border-indigo-200 p-10 text-center">
                 <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -701,12 +789,20 @@ export default function Cabinet() {
                   {CABINET_PLANS.filter(p => orderCart[p.id]).map(p => (
                     <div key={p.id} className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">{p.title}</span>
-                      <span className="font-semibold text-slate-800">× {orderCart[p.id]}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-400">× {orderCart[p.id]}</span>
+                        <span className="font-semibold text-slate-800">{p.price}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
-                <div className="pt-2 border-t border-slate-100">
-                  <p className="text-xs text-slate-400 mb-3">После оформления абонементы появятся во вкладке «Абонементы». Оплата — через ЮКассу или Telegram-бота.</p>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Итого:</span>
+                  <span className="text-xl font-black text-indigo-700">
+                    {totalOrderPrice.toLocaleString("ru-RU")} ₽
+                  </span>
+                </div>
+                <div>
                   <button
                     onClick={handleOrderCheckout}
                     disabled={orderLoading}
@@ -718,14 +814,14 @@ export default function Cabinet() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
-                        Оформляем...
+                        Переходим к оплате...
                       </>
                     ) : (
                       <>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                         </svg>
-                        Оформить {totalOrderItems} {totalOrderItems === 1 ? "абонемент" : totalOrderItems < 5 ? "абонемента" : "абонементов"}
+                        Оплатить {totalOrderItems === 1 ? "абонемент" : `${totalOrderItems} ${totalOrderItems < 5 ? "абонемента" : "абонементов"}`} — {totalOrderPrice.toLocaleString("ru-RU")} ₽
                       </>
                     )}
                   </button>

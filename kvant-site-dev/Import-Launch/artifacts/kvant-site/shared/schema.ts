@@ -77,6 +77,7 @@ export const payments = pgTable("payments", {
   amount: text("amount").notNull(),
   currency: text("currency").notNull().default("RUB"),
   description: text("description"),
+  cartSubscriptionIds: text("cart_subscription_ids"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

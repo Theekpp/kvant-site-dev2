@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "./db";
 import { accounts, subscriptions, payments, refunds } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray, isNotNull, and } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "./auth";
 import { randomUUID } from "crypto";
 
@@ -59,7 +59,95 @@ function getTypeLabel(type: string): string {
   return type === "group" ? "Групповые занятия" : "Индивидуальные занятия";
 }
 
+async function markSubscriptionsPaid(subIds: number[]) {
+  for (const subId of subIds) {
+    await db.update(subscriptions)
+      .set({ isPaid: true })
+      .where(eq(subscriptions.id, subId));
+  }
+}
+
 export function registerPaymentRoutes(app: Express) {
+
+  app.post("/api/cabinet/pay-cart", requireAuth, async (req, res) => {
+    if (!isConfigured()) {
+      return res.status(503).json({
+        message: "Платёжная система не настроена. Обратитесь к репетитору.",
+      });
+    }
+
+    const { subscriptionIds } = req.body;
+    if (!Array.isArray(subscriptionIds) || subscriptionIds.length === 0) {
+      return res.status(400).json({ message: "Нет абонементов для оплаты" });
+    }
+
+    const ids = subscriptionIds.map(Number).filter(n => !isNaN(n));
+    if (ids.length === 0) {
+      return res.status(400).json({ message: "Неверные идентификаторы абонементов" });
+    }
+
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account) return res.status(404).json({ message: "Аккаунт не найден" });
+
+      const subs = await db.select().from(subscriptions).where(inArray(subscriptions.id, ids));
+
+      for (const sub of subs) {
+        if (sub.userId !== account.userId) return res.status(403).json({ message: "Нет доступа к одному из абонементов" });
+        if (sub.isPaid) return res.status(400).json({ message: `Абонемент #${sub.id} уже оплачен` });
+      }
+
+      let totalAmount = 0;
+      for (const sub of subs) {
+        const price = getPriceForSubscription(sub.type, sub.totalLessons);
+        if (!price) return res.status(400).json({ message: "Не удалось определить стоимость одного из абонементов" });
+        totalAmount += price;
+      }
+
+      const primarySubId = subs[0].id;
+      const description = subs.length === 1
+        ? `${getTypeLabel(subs[0].type)} по физике — ${getLessonLabel(subs[0].totalLessons)} (Кирилл Анисимов)`
+        : `Абонементы по физике — ${subs.length} шт. (Кирилл Анисимов)`;
+
+      const idempotenceKey = randomUUID();
+
+      const payment = await yookassaRequest("POST", "/payments", {
+        amount: { value: totalAmount.toFixed(2), currency: "RUB" },
+        confirmation: {
+          type: "redirect",
+          return_url: `${FRONTEND_URL}/cabinet?payment=success`,
+        },
+        description,
+        capture: true,
+        metadata: {
+          subscriptionId: String(primarySubId),
+          subscriptionIds: JSON.stringify(ids),
+          accountId: String(account.id),
+        },
+      }, idempotenceKey);
+
+      await db.insert(payments).values({
+        subscriptionId: primarySubId,
+        accountId: account.id,
+        yookassaPaymentId: payment.id,
+        status: payment.status,
+        amount: totalAmount.toFixed(2),
+        currency: "RUB",
+        description,
+        cartSubscriptionIds: JSON.stringify(ids),
+      });
+
+      return res.json({
+        paymentId: payment.id,
+        confirmationUrl: payment.confirmation.confirmation_url,
+        amount: totalAmount.toFixed(2),
+      });
+    } catch (e: any) {
+      console.error("[payments] Error creating cart payment:", e?.message || e);
+      return res.status(500).json({ message: "Ошибка при создании платежа. Попробуйте позже." });
+    }
+  });
+
   app.post("/api/cabinet/pay/:subscriptionId", requireAuth, async (req, res) => {
     if (!isConfigured()) {
       return res.status(503).json({
@@ -148,11 +236,17 @@ export function registerPaymentRoutes(app: Express) {
             .set({ status: "refunded", updatedAt: new Date() })
             .where(eq(payments.yookassaPaymentId, yookassaPaymentId));
 
-          await db.update(subscriptions)
-            .set({ isPaid: false })
-            .where(eq(subscriptions.id, payment.subscriptionId));
+          const subIds = payment.cartSubscriptionIds
+            ? (JSON.parse(payment.cartSubscriptionIds) as number[])
+            : [payment.subscriptionId];
 
-          console.log(`[payments] Refund ${yookassaRefundId} succeeded for subscription ${payment.subscriptionId}, amount: ${refundAmount} RUB`);
+          for (const subId of subIds) {
+            await db.update(subscriptions)
+              .set({ isPaid: false })
+              .where(eq(subscriptions.id, subId));
+          }
+
+          console.log(`[payments] Refund ${yookassaRefundId} succeeded for subscriptions ${subIds.join(", ")}, amount: ${refundAmount} RUB`);
         }
 
         return res.status(200).json({ ok: true });
@@ -173,10 +267,12 @@ export function registerPaymentRoutes(app: Express) {
         .where(eq(payments.yookassaPaymentId, yookassaPaymentId));
 
       if (eventType === "payment.succeeded" && newStatus === "succeeded") {
-        await db.update(subscriptions)
-          .set({ isPaid: true })
-          .where(eq(subscriptions.id, payment.subscriptionId));
-        console.log(`[payments] Subscription ${payment.subscriptionId} marked as paid via webhook`);
+        const subIds = payment.cartSubscriptionIds
+          ? (JSON.parse(payment.cartSubscriptionIds) as number[])
+          : [payment.subscriptionId];
+
+        await markSubscriptionsPaid(subIds);
+        console.log(`[payments] Subscriptions ${subIds.join(", ")} marked as paid via webhook`);
       }
 
       if (eventType === "payment.canceled") {
@@ -212,27 +308,45 @@ export function registerPaymentRoutes(app: Express) {
         return res.json({ isPaid: false });
       }
 
-      const [payment] = await db.select().from(payments)
+      const [directPayment] = await db.select().from(payments)
         .where(eq(payments.subscriptionId, subscriptionId))
         .orderBy(desc(payments.createdAt))
         .limit(1);
 
-      if (!payment) {
+      let targetPayment = directPayment || null;
+
+      if (!targetPayment) {
+        const cartPayments = await db.select().from(payments)
+          .where(and(eq(payments.accountId, account.id), isNotNull(payments.cartSubscriptionIds)))
+          .orderBy(desc(payments.createdAt));
+
+        for (const cp of cartPayments) {
+          const cartIds = JSON.parse(cp.cartSubscriptionIds!) as number[];
+          if (cartIds.includes(subscriptionId)) {
+            targetPayment = cp;
+            break;
+          }
+        }
+      }
+
+      if (!targetPayment) {
         return res.json({ isPaid: false });
       }
 
-      const ykPayment = await yookassaRequest("GET", `/payments/${payment.yookassaPaymentId}`);
+      const ykPayment = await yookassaRequest("GET", `/payments/${targetPayment.yookassaPaymentId}`);
       const status: string = ykPayment.status;
 
       await db.update(payments)
         .set({ status, updatedAt: new Date() })
-        .where(eq(payments.yookassaPaymentId, payment.yookassaPaymentId));
+        .where(eq(payments.yookassaPaymentId, targetPayment.yookassaPaymentId));
 
       if (status === "succeeded") {
-        await db.update(subscriptions)
-          .set({ isPaid: true })
-          .where(eq(subscriptions.id, subscriptionId));
-        console.log(`[payments] Subscription ${subscriptionId} marked as paid via status check`);
+        const subIds = targetPayment.cartSubscriptionIds
+          ? (JSON.parse(targetPayment.cartSubscriptionIds) as number[])
+          : [targetPayment.subscriptionId];
+
+        await markSubscriptionsPaid(subIds);
+        console.log(`[payments] Subscriptions ${subIds.join(", ")} marked as paid via status check`);
         return res.json({ isPaid: true });
       }
 

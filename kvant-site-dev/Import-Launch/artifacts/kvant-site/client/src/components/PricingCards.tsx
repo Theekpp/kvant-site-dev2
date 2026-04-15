@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { botLink, BOT_URL } from "@/lib/bot";
-import api from "@/lib/api";
 
 function AtomIcon({ animated = false }: { animated?: boolean }) {
   return (
@@ -884,7 +883,6 @@ function PricingCard({ plan, isLoggedIn, count = 0, onAdd, onRemove }: {
 
 export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [cartLoading, setCartLoading] = useState(false);
 
   const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
 
@@ -898,21 +896,9 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
       return { ...c, [planId]: n };
     });
 
-  const handleCheckout = async () => {
-    setCartLoading(true);
-    try {
-      for (const [planId, qty] of Object.entries(cart)) {
-        const plan = plans.find(p => p.id === planId);
-        if (!plan) continue;
-        for (let i = 0; i < qty; i++) {
-          await api.post("/api/cabinet/subscriptions", { type: plan.subType, totalLessons: plan.lessons });
-        }
-      }
-      window.location.href = "/cabinet";
-    } catch {
-      alert("Ошибка при оформлении. Попробуйте ещё раз.");
-      setCartLoading(false);
-    }
+  const handleCheckout = () => {
+    localStorage.setItem("pricing_cart", JSON.stringify(cart));
+    window.location.href = "/cabinet?tab=order";
   };
 
   const lessonWord = (n: number) => n === 1 ? "занятие" : n < 5 ? "занятия" : "занятий";
@@ -953,10 +939,9 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
           </span>
           <button
             onClick={handleCheckout}
-            disabled={cartLoading}
-            className="bg-white text-indigo-700 px-4 py-1.5 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all disabled:opacity-60 whitespace-nowrap shadow-sm"
+            className="bg-white text-indigo-700 px-4 py-1.5 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all whitespace-nowrap shadow-sm"
           >
-            {cartLoading ? "Оформляем..." : "Перейти к оформлению →"}
+            Перейти к оформлению →
           </button>
         </div>
       )}
