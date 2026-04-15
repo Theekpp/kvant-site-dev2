@@ -724,11 +724,15 @@ function AuthModal({ plan, onClose }: { plan: typeof plans[0]; onClose: () => vo
   );
 }
 
-function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: boolean }) {
+function PricingCard({ plan, isLoggedIn, count = 0, onAdd, onRemove }: {
+  plan: typeof plans[0];
+  isLoggedIn: boolean;
+  count?: number;
+  onAdd?: () => void;
+  onRemove?: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [added, setAdded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const iconRef = useRef<HTMLDivElement>(null);
 
@@ -842,34 +846,36 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
         )}
       </div>
 
-      <button
-        disabled={adding || added}
-        onClick={async () => {
-          if (isLoggedIn) {
-            setAdding(true);
-            try {
-              await api.post("/api/cabinet/subscriptions", {
-                type: plan.subType,
-                totalLessons: plan.lessons,
-              });
-              setAdded(true);
-              setTimeout(() => window.location.href = "/cabinet", 1200);
-            } catch {
-              setAdding(false);
-              alert("Не удалось добавить. Попробуйте ещё раз.");
+      {isLoggedIn && count > 0 ? (
+        <div className="flex items-center justify-between gap-2 relative z-10">
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove?.(); }}
+            className={`flex-1 h-10 rounded-xl text-xl font-bold transition-all ${isFeatured ? "bg-white/20 text-white hover:bg-white/30" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+          >−</button>
+          <span className={`text-lg font-bold min-w-[2rem] text-center ${isFeatured ? "text-white" : "text-slate-800"}`}>{count}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAdd?.(); }}
+            className={`flex-1 h-10 rounded-xl text-xl font-bold transition-all ${isFeatured ? "bg-white/20 text-white hover:bg-white/30" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+          >+</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => {
+            if (isLoggedIn) {
+              onAdd?.();
+            } else {
+              setShowModal(true);
             }
-          } else {
-            setShowModal(true);
-          }
-        }}
-        className={`w-full py-2.5 rounded-xl text-sm font-semibold text-center transition-all duration-200 relative z-10 cursor-pointer disabled:opacity-70
-          ${isFeatured
-            ? "bg-white text-indigo-700 hover:bg-blue-50 shadow-lg"
-            : `bg-gradient-to-r ${plan.gradient} text-white hover:opacity-90 shadow-md`
-          }`}
-      >
-        {added ? "✓ Добавлено!" : adding ? "Добавляем..." : plan.buttonText}
-      </button>
+          }}
+          className={`w-full py-2.5 rounded-xl text-sm font-semibold text-center transition-all duration-200 relative z-10 cursor-pointer
+            ${isFeatured
+              ? "bg-white text-indigo-700 hover:bg-blue-50 shadow-lg"
+              : `bg-gradient-to-r ${plan.gradient} text-white hover:opacity-90 shadow-md`
+            }`}
+        >
+          {plan.buttonText}
+        </button>
+      )}
 
       {showModal && <AuthModal plan={plan} onClose={() => { setShowModal(false); setHovered(false); }} />}
     </div>
@@ -877,6 +883,40 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
 }
 
 export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [cartLoading, setCartLoading] = useState(false);
+
+  const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
+
+  const addToCart = (planId: string) =>
+    setCart(c => ({ ...c, [planId]: (c[planId] || 0) + 1 }));
+
+  const removeFromCart = (planId: string) =>
+    setCart(c => {
+      const n = (c[planId] || 0) - 1;
+      if (n <= 0) { const { [planId]: _, ...rest } = c; return rest; }
+      return { ...c, [planId]: n };
+    });
+
+  const handleCheckout = async () => {
+    setCartLoading(true);
+    try {
+      for (const [planId, qty] of Object.entries(cart)) {
+        const plan = plans.find(p => p.id === planId);
+        if (!plan) continue;
+        for (let i = 0; i < qty; i++) {
+          await api.post("/api/cabinet/subscriptions", { type: plan.subType, totalLessons: plan.lessons });
+        }
+      }
+      window.location.href = "/cabinet";
+    } catch {
+      alert("Ошибка при оформлении. Попробуйте ещё раз.");
+      setCartLoading(false);
+    }
+  };
+
+  const lessonWord = (n: number) => n === 1 ? "занятие" : n < 5 ? "занятия" : "занятий";
+
   return (
     <>
       <style>{`
@@ -891,10 +931,35 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
           style={{ gap: 'clamp(16px, calc(1.5vw + 8px), 40px)', maxWidth: 'min(calc(100vw - 64px), 1600px)' }}
         >
           {plans.map((plan) => (
-            <PricingCard key={plan.id} plan={plan} isLoggedIn={isLoggedIn} />
+            <PricingCard
+              key={plan.id}
+              plan={plan}
+              isLoggedIn={isLoggedIn}
+              count={cart[plan.id] || 0}
+              onAdd={() => addToCart(plan.id)}
+              onRemove={() => removeFromCart(plan.id)}
+            />
           ))}
         </div>
       </div>
+
+      {isLoggedIn && totalItems > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-indigo-600 text-white px-6 py-3.5 rounded-2xl shadow-2xl border border-indigo-500 animate-in slide-in-from-bottom-4">
+          <svg className="w-5 h-5 opacity-80 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span className="text-sm font-semibold whitespace-nowrap">
+            В корзине: <span className="font-black">{totalItems}</span> {lessonWord(totalItems)}
+          </span>
+          <button
+            onClick={handleCheckout}
+            disabled={cartLoading}
+            className="bg-white text-indigo-700 px-4 py-1.5 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all disabled:opacity-60 whitespace-nowrap shadow-sm"
+          >
+            {cartLoading ? "Оформляем..." : "Перейти к оформлению →"}
+          </button>
+        </div>
+      )}
     </>
   );
 }

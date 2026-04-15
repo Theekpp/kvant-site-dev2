@@ -42,7 +42,14 @@ interface ScheduleSlot {
   specificDate: string | null;
 }
 
-type Tab = "overview" | "subscriptions" | "book" | "history" | "profile";
+type Tab = "overview" | "subscriptions" | "order" | "book" | "history" | "profile";
+
+const CABINET_PLANS = [
+  { id: "single", title: "Разовое занятие", subtitle: "1 занятие", price: "1 500 ₽", subType: "individual", lessons: 1, badgeCls: "bg-indigo-100 text-indigo-700", priceCls: "text-indigo-600", borderCls: "border-indigo-100", bgCls: "bg-indigo-50" },
+  { id: "progress", title: "Пакет «Прогресс»", subtitle: "4 занятия", price: "5 700 ₽", priceOld: "6 000 ₽", subType: "individual", lessons: 4, badgeCls: "bg-emerald-100 text-emerald-700", priceCls: "text-emerald-600", borderCls: "border-emerald-100", bgCls: "bg-emerald-50" },
+  { id: "max", title: "Пакет «Максимальный результат»", subtitle: "8 занятий", price: "10 800 ₽", priceOld: "12 000 ₽", subType: "individual", lessons: 8, featured: true, badgeCls: "bg-orange-100 text-orange-700", priceCls: "text-orange-600", borderCls: "border-orange-200", bgCls: "bg-orange-50" },
+  { id: "group", title: "Групповое занятие", subtitle: "до 4 учеников", price: "1 000 ₽", subType: "group", lessons: 1, badgeCls: "bg-violet-100 text-violet-700", priceCls: "text-violet-600", borderCls: "border-violet-100", bgCls: "bg-violet-50" },
+];
 
 const DAY_NAMES = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const DAY_NAMES_FULL = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
@@ -128,6 +135,39 @@ export default function Cabinet() {
   const [paymentLoading, setPaymentLoading] = useState<number | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [checkStatusLoading, setCheckStatusLoading] = useState<number | null>(null);
+
+  const [orderCart, setOrderCart] = useState<Record<string, number>>({});
+  const [orderLoading, setOrderLoading] = useState(false);
+
+  const totalOrderItems = Object.values(orderCart).reduce((a, b) => a + b, 0);
+
+  const addPlan = (id: string) => setOrderCart(c => ({ ...c, [id]: (c[id] || 0) + 1 }));
+  const removePlan = (id: string) => setOrderCart(c => {
+    const n = (c[id] || 0) - 1;
+    if (n <= 0) { const { [id]: _, ...rest } = c; return rest; }
+    return { ...c, [id]: n };
+  });
+
+  const handleOrderCheckout = async () => {
+    setOrderLoading(true);
+    try {
+      for (const [planId, qty] of Object.entries(orderCart)) {
+        const plan = CABINET_PLANS.find(p => p.id === planId);
+        if (!plan) continue;
+        for (let i = 0; i < qty; i++) {
+          await api.post("/api/cabinet/subscriptions", { type: plan.subType, totalLessons: plan.lessons });
+        }
+      }
+      const [sub] = await Promise.all([api.get("/api/cabinet/subscriptions")]);
+      setSubscriptions(sub.data);
+      setOrderCart({});
+      setActiveTab("subscriptions");
+    } catch {
+      alert("Ошибка при оформлении. Попробуйте ещё раз.");
+    } finally {
+      setOrderLoading(false);
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -280,6 +320,7 @@ export default function Cabinet() {
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "overview", label: "Обзор", icon: "⊡" },
     { id: "subscriptions", label: "Абонементы", icon: "◈" },
+    { id: "order", label: "Выбрать тариф", icon: "⊕" },
     { id: "book", label: "Записаться", icon: "+" },
     { id: "history", label: "История", icon: "◷" },
     { id: "profile", label: "Профиль", icon: "◉" },
@@ -467,9 +508,9 @@ export default function Cabinet() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-900">Абонементы</h2>
-              <a href="/#services" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1">
+              <button onClick={() => setActiveTab("order")} className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1">
                 + Добавить
-              </a>
+              </button>
             </div>
 
             {subscriptions.length === 0 ? (
@@ -480,9 +521,9 @@ export default function Cabinet() {
                   </svg>
                 </div>
                 <p className="text-slate-500 text-sm font-medium">Абонементов пока нет</p>
-                <a href="/#services" className="mt-3 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition">
+                <button onClick={() => setActiveTab("order")} className="mt-3 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition">
                   Выбрать тариф →
-                </a>
+                </button>
               </div>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4">
@@ -598,6 +639,97 @@ export default function Cabinet() {
                   Для оплаты абонемента свяжитесь с преподавателем через{" "}
                   <a href="https://t.me/physictutor_bot" target="_blank" rel="noopener noreferrer" className="font-semibold underline hover:text-indigo-900">Telegram-бот</a>.
                 </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ORDER / SELECT PLAN ── */}
+        {activeTab === "order" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900">Выбрать тариф</h2>
+              {totalOrderItems > 0 && (
+                <span className="text-sm font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                  В корзине: {totalOrderItems}
+                </span>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              {CABINET_PLANS.map(plan => (
+                <div
+                  key={plan.id}
+                  className={`bg-white rounded-2xl border p-5 shadow-sm flex flex-col gap-4 transition-shadow hover:shadow-md ${
+                    orderCart[plan.id] ? `border-indigo-300 ring-2 ring-indigo-100` : `${plan.borderCls}`
+                  }${"featured" in plan && plan.featured ? " relative" : ""}`}
+                >
+                  {"featured" in plan && plan.featured && (
+                    <div className="absolute -top-2.5 left-4 bg-orange-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">ХИТ 🔥</div>
+                  )}
+                  <div>
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${plan.badgeCls}`}>{plan.subtitle}</span>
+                    <h3 className="font-bold text-slate-900 mt-2 mb-1">{plan.title}</h3>
+                    <div className="flex items-baseline gap-1.5">
+                      {"priceOld" in plan && plan.priceOld && (
+                        <span className="text-xs line-through text-red-400">{plan.priceOld}</span>
+                      )}
+                      <span className={`text-xl font-black ${plan.priceCls}`}>{plan.price}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => removePlan(plan.id)}
+                      disabled={!orderCart[plan.id]}
+                      className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 text-xl font-bold hover:bg-slate-200 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                    >−</button>
+                    <span className="text-lg font-bold text-slate-800 w-8 text-center">{orderCart[plan.id] || 0}</span>
+                    <button
+                      onClick={() => addPlan(plan.id)}
+                      className={`w-10 h-10 rounded-xl text-xl font-bold transition flex items-center justify-center ${plan.bgCls} ${plan.priceCls} hover:opacity-80`}
+                    >+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {totalOrderItems > 0 && (
+              <div className="bg-white rounded-2xl border border-indigo-100 p-5 shadow-sm space-y-3">
+                <h3 className="font-bold text-slate-900">Ваш заказ</h3>
+                <div className="space-y-2">
+                  {CABINET_PLANS.filter(p => orderCart[p.id]).map(p => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">{p.title}</span>
+                      <span className="font-semibold text-slate-800">× {orderCart[p.id]}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-xs text-slate-400 mb-3">После оформления абонементы появятся во вкладке «Абонементы». Оплата — через ЮКассу или Telegram-бота.</p>
+                  <button
+                    onClick={handleOrderCheckout}
+                    disabled={orderLoading}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {orderLoading ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Оформляем...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Оформить {totalOrderItems} {totalOrderItems === 1 ? "абонемент" : totalOrderItems < 5 ? "абонемента" : "абонементов"}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>
