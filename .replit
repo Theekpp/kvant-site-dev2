@@ -45,3 +45,8 @@ externalPort = 8081
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm run start"]
 build = ["bash", "-c", "cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm run build"]
+
+[userenv]
+
+[userenv.shared]
+FRONTEND_URL = "https://ea9ca581-63ae-4b94-ae0d-5c52f2d7440e-00-1id0fw0mrzove.riker.replit.dev"
