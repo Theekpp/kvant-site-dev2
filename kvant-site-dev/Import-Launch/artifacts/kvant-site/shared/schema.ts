@@ -110,6 +110,17 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+export const adminLogs = pgTable("admin_logs", {
+  id: serial("id").primaryKey(),
+  action: text("action").notNull(),
+  entity: text("entity").notNull(),
+  entityId: integer("entity_id"),
+  description: text("description").notNull(),
+  meta: text("meta"),
+  actorId: integer("actor_id").references(() => accounts.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export const refunds = pgTable("refunds", {
   id: serial("id").primaryKey(),
   paymentId: integer("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }),
