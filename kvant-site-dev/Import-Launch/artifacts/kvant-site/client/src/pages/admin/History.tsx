@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGetAdminActions } from "@/lib/admin-api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, History as HistoryIcon } from "lucide-react";
@@ -82,10 +82,11 @@ const ENTITY_MAP: Record<string, string> = {
   schedule: "Расписание",
 };
 
+const LIMIT = 10;
+
 export default function History() {
   const [page, setPage] = useState(1);
-  const limit = 50;
-  const { data, isLoading } = useGetAdminActions(page, limit);
+  const { data, isLoading } = useGetAdminActions(page, LIMIT);
 
   const actions = data?.actions || [];
   const total = data?.total || 0;
@@ -111,7 +112,7 @@ export default function History() {
               <p>Загрузка истории...</p>
             </div>
           </div>
-        ) : actions.length === 0 ? (
+        ) : actions.length === 0 && total === 0 ? (
           <div className="p-8 text-center text-muted-foreground h-[300px] flex items-center justify-center">
             <div>
               <HistoryIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
@@ -120,61 +121,78 @@ export default function History() {
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-border/60">
-            {actions.map((action: any) => {
-              const meta = ACTION_META[action.action] || { label: action.action, color: "bg-gray-100 text-gray-700 border-gray-200", emoji: "🔧" };
-              const details = parseDetails(action.details);
-              const detailsStr = formatDetails(action.action, details);
-              const entityLabel = ENTITY_MAP[action.entity] || action.entity;
+          <>
+            <div className="divide-y divide-border/60">
+              {actions.map((action: any) => {
+                const meta = ACTION_META[action.action] || { label: action.action, color: "bg-gray-100 text-gray-700 border-gray-200", emoji: "🔧" };
+                const details = parseDetails(action.details);
+                const detailsStr = formatDetails(action.action, details);
+                const entityLabel = ENTITY_MAP[action.entity] || action.entity;
 
-              return (
-                <div key={action.id} className="flex items-start gap-4 px-5 py-4 hover:bg-muted/20 transition-colors">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <span className="text-xl leading-none">{meta.emoji}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <Badge variant="outline" className={`text-xs font-medium no-default-active-elevate ${meta.color}`}>
-                        {meta.label}
-                      </Badge>
-                      {action.entityId && (
+                return (
+                  <div key={action.id} className="flex items-start gap-4 px-5 py-4 hover:bg-muted/20 transition-colors">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <span className="text-xl leading-none">{meta.emoji}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <Badge variant="outline" className={`text-xs font-medium no-default-active-elevate ${meta.color}`}>
+                          {meta.label}
+                        </Badge>
+                        {action.entityId && (
+                          <span className="text-xs text-muted-foreground">
+                            {entityLabel} #{action.entityId}
+                          </span>
+                        )}
+                      </div>
+                      {detailsStr && (
+                        <p className="text-sm text-foreground/80 leading-relaxed">{detailsStr}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-1.5">
                         <span className="text-xs text-muted-foreground">
-                          {entityLabel} #{action.entityId}
+                          {format(parseISO(action.createdAt), "d MMMM yyyy, HH:mm", { locale: ru })}
                         </span>
-                      )}
-                    </div>
-                    {detailsStr && (
-                      <p className="text-sm text-foreground/80 leading-relaxed">{detailsStr}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-xs text-muted-foreground">
-                        {format(parseISO(action.createdAt), "d MMMM yyyy, HH:mm", { locale: ru })}
-                      </span>
-                      {action.performedBy && (
-                        <span className="text-xs text-muted-foreground">· {action.performedBy}</span>
-                      )}
+                        {action.performedBy && (
+                          <span className="text-xs text-muted-foreground">· {action.performedBy}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3 border-t border-border/60 bg-muted/10">
+              <span className="text-xs text-muted-foreground">
+                Записи {Math.min((page - 1) * LIMIT + 1, total)}–{Math.min(page * LIMIT, total)} из {total}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground px-1 min-w-[80px] text-center">
+                  {page} / {pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(p => Math.min(pages, p + 1))}
+                  disabled={page === pages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </Card>
-
-      {pages > 1 && (
-        <div className="flex items-center justify-center gap-3">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Страница {page} из {pages}
-          </span>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

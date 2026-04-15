@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [chartMode, setChartMode] = useState<"bookings" | "bot" | "revenue">("bookings");
   const [chartMonth, setChartMonth] = useState(new Date());
   const [chartWeek, setChartWeek] = useState(new Date());
+  const [revenueYear, setRevenueYear] = useState(new Date().getFullYear());
 
   const isLoading = usersLoading || bookingsLoading || subsLoading;
 
@@ -57,13 +58,32 @@ export default function Dashboard() {
   const activeSubscriptions = subscriptions?.filter((s: any) => s.remainingLessons > 0 && s.isPaid && s.status !== 'cancelled').length || 0;
   const totalBookings = bookings?.length || 0;
 
-  // Bookings chart
-  let bookingsChartData: { name: string; count: number }[] = [];
-  let periodLabel = "";
+  // ── Shared period logic ──────────────────────────────────────────────────
+  const monthStart = startOfMonth(chartMonth);
+  const monthEnd = endOfMonth(chartMonth);
+  const wkStart = startOfWeek(chartWeek, { weekStartsOn: 1 });
+  const wkEnd = endOfWeek(chartWeek, { weekStartsOn: 1 });
 
+  const periodLabel = viewMode === "month"
+    ? format(chartMonth, "LLLL yyyy", { locale: ru })
+    : `${format(wkStart, 'd MMM', { locale: ru })} – ${format(wkEnd, 'd MMM yyyy', { locale: ru })}`;
+
+  const isAtFuture = viewMode === "month"
+    ? getMonth(chartMonth) === getMonth(new Date()) && getYear(chartMonth) === getYear(new Date())
+    : wkStart >= startOfWeek(new Date(), { weekStartsOn: 1 });
+
+  const handlePrev = () => {
+    if (viewMode === "month") setChartMonth(m => subMonths(m, 1));
+    else setChartWeek(w => subWeeks(w, 1));
+  };
+  const handleNext = () => {
+    if (viewMode === "month") setChartMonth(m => addMonths(m, 1));
+    else setChartWeek(w => addWeeks(w, 1));
+  };
+
+  // ── Bookings chart ───────────────────────────────────────────────────────
+  let bookingsChartData: { name: string; count: number }[] = [];
   if (viewMode === "month") {
-    const monthStart = startOfMonth(chartMonth);
-    const monthEnd = endOfMonth(chartMonth);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
     const weekGroups: Record<number, Date[]> = {};
     for (const day of days) {
@@ -83,10 +103,7 @@ export default function Dashboard() {
       const last = weekDays[weekDays.length - 1];
       return { name: `${format(first, 'd')}-${format(last, 'd')}`, count: cnt };
     });
-    periodLabel = format(chartMonth, "LLLL yyyy", { locale: ru });
   } else {
-    const wkStart = startOfWeek(chartWeek, { weekStartsOn: 1 });
-    const wkEnd = endOfWeek(chartWeek, { weekStartsOn: 1 });
     bookingsChartData = eachDayOfInterval({ start: wkStart, end: wkEnd }).map(day => {
       const cnt = (bookings || []).filter((b: any) => {
         const d = parseBookingDate(b.date);
@@ -95,44 +112,80 @@ export default function Dashboard() {
       }).length;
       return { name: format(day, 'EEE d', { locale: ru }), count: cnt };
     });
-    periodLabel = `${format(wkStart, 'd MMM', { locale: ru })} – ${format(wkEnd, 'd MMM yyyy', { locale: ru })}`;
   }
 
-  const maxCount = Math.max(...bookingsChartData.map(d => d.count), 1);
-  const yMax = Math.ceil(maxCount * 1.2) || 4;
-
-  const handlePrev = () => {
-    if (viewMode === "month") setChartMonth(m => subMonths(m, 1));
-    else setChartWeek(w => subWeeks(w, 1));
-  };
-  const handleNext = () => {
-    if (viewMode === "month") setChartMonth(m => addMonths(m, 1));
-    else setChartWeek(w => addWeeks(w, 1));
-  };
-  const isAtFuture = viewMode === "month"
-    ? getMonth(chartMonth) === getMonth(new Date()) && getYear(chartMonth) === getYear(new Date())
-    : startOfWeek(chartWeek, { weekStartsOn: 1 }) >= startOfWeek(new Date(), { weekStartsOn: 1 });
-
-  const funnel = analytics?.funnel;
-  const revenueData = (analytics?.revenueByMonth || []).map((r: any) => {
-    const [year, month] = r.month.split("-");
-    return {
-      name: `${MONTH_NAMES_RU[parseInt(month) - 1]} ${year.slice(2)}`,
-      amount: Math.round(r.amount),
-    };
+  // ── Bot activity chart ───────────────────────────────────────────────────
+  const rawBot: { date: string; count: number }[] = analytics?.botActivityByDay || [];
+  let botChartData: { name: string; count: number }[] = [];
+  if (viewMode === "month") {
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    const weekGroups: Record<number, Date[]> = {};
+    for (const day of days) {
+      const wk = getWeek(day, { weekStartsOn: 1 });
+      if (!weekGroups[wk]) weekGroups[wk] = [];
+      weekGroups[wk].push(day);
+    }
+    botChartData = Object.values(weekGroups).map(weekDays => {
+      const cnt = rawBot.filter(b => {
+        const d = parseISO(b.date);
+        return weekDays.some(wd =>
+          wd.getDate() === d.getDate() && wd.getMonth() === d.getMonth() && wd.getFullYear() === d.getFullYear()
+        );
+      }).reduce((sum, b) => sum + b.count, 0);
+      const first = weekDays[0];
+      const last = weekDays[weekDays.length - 1];
+      return { name: `${format(first, 'd')}-${format(last, 'd')}`, count: cnt };
+    });
+  } else {
+    botChartData = eachDayOfInterval({ start: wkStart, end: wkEnd }).map(day => {
+      const entry = rawBot.find(b => {
+        const d = parseISO(b.date);
+        return d.getDate() === day.getDate() && d.getMonth() === day.getMonth() && d.getFullYear() === day.getFullYear();
+      });
+      return { name: format(day, 'EEE d', { locale: ru }), count: entry?.count || 0 };
+    });
+  }
+  const hasBotData = rawBot.some(b => {
+    const d = parseISO(b.date);
+    return getYear(d) === (viewMode === "month" ? getYear(chartMonth) : getYear(chartWeek));
   });
-  const botData = (analytics?.botActivityByDay || []).slice(-30).map((d: any) => ({
-    name: d.date,
-    count: d.count,
-  }));
-  const attentionStudents = analytics?.attentionStudents || [];
 
+  // ── Revenue chart ────────────────────────────────────────────────────────
+  const rawRevenue: { month: string; amount: number }[] = analytics?.revenueByMonth || [];
+  const revenueChartData = MONTH_NAMES_RU.map((name, i) => {
+    const monthStr = `${revenueYear}-${String(i + 1).padStart(2, '0')}`;
+    const entry = rawRevenue.find(r => r.month === monthStr);
+    return { name, amount: entry ? Math.round(entry.amount) : 0 };
+  });
+  const hasRevenueData = revenueChartData.some(d => d.amount > 0);
+  const currentYear = new Date().getFullYear();
+  const minYear = rawRevenue.length > 0
+    ? Math.min(...rawRevenue.map(r => parseInt(r.month.split('-')[0])))
+    : currentYear;
+
+  // ── Chart max values ─────────────────────────────────────────────────────
+  const bookingsMax = Math.ceil(Math.max(...bookingsChartData.map(d => d.count), 1) * 1.2) || 4;
+  const botMax = Math.ceil(Math.max(...botChartData.map(d => d.count), 1) * 1.2) || 4;
+
+  // ── Funnel & attention ───────────────────────────────────────────────────
+  const funnel = analytics?.funnel;
+  const attentionStudents = analytics?.attentionStudents || [];
   const funnelSteps = funnel ? [
-    { label: "Зарегистрировались", value: funnel.totalUsers, color: "bg-primary", pct: 100 },
-    { label: "Верифицировали email", value: funnel.verifiedEmails, color: "bg-blue-500", pct: funnel.totalUsers ? Math.round((funnel.verifiedEmails / funnel.totalUsers) * 100) : 0 },
-    { label: "Записались на занятие", value: funnel.hadBooking, color: "bg-emerald-500", pct: funnel.totalUsers ? Math.round((funnel.hadBooking / funnel.totalUsers) * 100) : 0 },
-    { label: "Оплатили", value: funnel.paid, color: "bg-amber-500", pct: funnel.totalUsers ? Math.round((funnel.paid / funnel.totalUsers) * 100) : 0 },
+    { label: "Зарегистрировались",   value: funnel.totalUsers,     color: "bg-primary",     pct: 100 },
+    { label: "Верифицировали email", value: funnel.verifiedEmails, color: "bg-blue-500",    pct: funnel.totalUsers ? Math.round((funnel.verifiedEmails / funnel.totalUsers) * 100) : 0 },
+    { label: "Записались на занятие",value: funnel.hadBooking,     color: "bg-emerald-500", pct: funnel.totalUsers ? Math.round((funnel.hadBooking   / funnel.totalUsers) * 100) : 0 },
+    { label: "Оплатили",             value: funnel.paid,           color: "bg-amber-500",   pct: funnel.totalUsers ? Math.round((funnel.paid         / funnel.totalUsers) * 100) : 0 },
   ] : [];
+
+  const tooltipStyle = {
+    borderRadius: '12px',
+    border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--color-card)',
+    color: 'var(--color-card-foreground)',
+  };
+
+  // ── Navigation controls ──────────────────────────────────────────────────
+  const showPeriodNav = chartMode === "bookings" || chartMode === "bot";
 
   return (
     <div className="space-y-8">
@@ -188,9 +241,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Funnel + Attention side-by-side */}
+      {/* Funnel + Attention */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Conversion Funnel */}
         <Card className="border-border/50 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -231,7 +283,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Attention students */}
         <Card className="border-border/50 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -281,31 +332,26 @@ export default function Dashboard() {
       <Card className="border-border/50 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
+            {/* Chart type tabs */}
             <div className="flex items-center gap-3 flex-wrap">
               <CardTitle>Аналитика</CardTitle>
               <div className="flex rounded-lg border border-border overflow-hidden">
-                <button
-                  onClick={() => setChartMode("bookings")}
-                  className={`px-3 py-1 text-xs font-medium transition-colors ${chartMode === "bookings" ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50'}`}
-                >
-                  Записи
-                </button>
-                <button
-                  onClick={() => setChartMode("bot")}
-                  className={`px-3 py-1 text-xs font-medium transition-colors ${chartMode === "bot" ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50'}`}
-                >
-                  Активность бота
-                </button>
-                <button
-                  onClick={() => setChartMode("revenue")}
-                  className={`px-3 py-1 text-xs font-medium transition-colors ${chartMode === "revenue" ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50'}`}
-                >
-                  Доход
-                </button>
+                {(["bookings", "bot", "revenue"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setChartMode(mode)}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${chartMode === mode ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50'}`}
+                  >
+                    {mode === "bookings" ? "Записи" : mode === "bot" ? "Активность бота" : "Доход"}
+                  </button>
+                ))}
               </div>
             </div>
-            {chartMode === "bookings" && (
-              <div className="flex items-center gap-2">
+
+            {/* Period navigation */}
+            <div className="flex items-center gap-2">
+              {/* Week/Month toggle — for bookings and bot */}
+              {showPeriodNav && (
                 <div className="flex rounded-lg border border-border overflow-hidden">
                   <button
                     onClick={() => setViewMode("week")}
@@ -320,28 +366,57 @@ export default function Dashboard() {
                     Месяц
                   </button>
                 </div>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium capitalize min-w-[180px] text-center">{periodLabel}</span>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNext} disabled={isAtFuture}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+              )}
+
+              {/* Prev / label / Next */}
+              {showPeriodNav && (
+                <>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium capitalize min-w-[180px] text-center">{periodLabel}</span>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNext} disabled={isAtFuture}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+
+              {/* Year navigation — for revenue */}
+              {chartMode === "revenue" && (
+                <>
+                  <Button
+                    variant="outline" size="icon" className="h-8 w-8"
+                    onClick={() => setRevenueYear(y => y - 1)}
+                    disabled={revenueYear <= minYear}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium min-w-[60px] text-center">{revenueYear}</span>
+                  <Button
+                    variant="outline" size="icon" className="h-8 w-8"
+                    onClick={() => setRevenueYear(y => y + 1)}
+                    disabled={revenueYear >= currentYear}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
+
         <CardContent>
           <div className="h-[320px] w-full pt-4">
+            {/* Bookings */}
             {chartMode === "bookings" && (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={bookingsChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} allowDecimals={false} domain={[0, yMax]} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} allowDecimals={false} domain={[0, bookingsMax]} />
                   <Tooltip
                     cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                    contentStyle={{ borderRadius: '12px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', color: 'var(--color-card-foreground)' }}
+                    contentStyle={tooltipStyle}
                     formatter={(value: any) => [value, 'Записей']}
                     labelFormatter={(label) => viewMode === "month" ? `Дни ${label}` : label}
                   />
@@ -350,18 +425,19 @@ export default function Dashboard() {
               </ResponsiveContainer>
             )}
 
+            {/* Bot activity */}
             {chartMode === "bot" && (
               analyticsLoading ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground">Загрузка...</div>
-              ) : botData.length === 0 ? (
+              ) : !hasBotData ? (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
                   <Activity className="h-10 w-10 opacity-30" />
-                  <p className="text-sm">Нет данных об активности бота</p>
+                  <p className="text-sm">Нет данных об активности бота за этот период</p>
                   <p className="text-xs">Данные появятся после интеграции с Telegram-ботом</p>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={botData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <AreaChart data={botChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="botGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
@@ -370,10 +446,11 @@ export default function Dashboard() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} allowDecimals={false} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} allowDecimals={false} domain={[0, botMax]} />
                     <Tooltip
-                      contentStyle={{ borderRadius: '12px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)' }}
+                      contentStyle={tooltipStyle}
                       formatter={(value: any) => [value, 'Уникальных пользователей']}
+                      labelFormatter={(label) => viewMode === "month" ? `Дни ${label}` : label}
                     />
                     <Area type="monotone" dataKey="count" stroke="var(--color-primary)" fill="url(#botGrad)" strokeWidth={2} dot={false} />
                   </AreaChart>
@@ -381,26 +458,27 @@ export default function Dashboard() {
               )
             )}
 
+            {/* Revenue */}
             {chartMode === "revenue" && (
               analyticsLoading ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground">Загрузка...</div>
-              ) : revenueData.length === 0 ? (
+              ) : !hasRevenueData ? (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
                   <TrendingUp className="h-10 w-10 opacity-30" />
-                  <p className="text-sm">Нет данных о доходах</p>
+                  <p className="text-sm">Нет данных о доходах за {revenueYear} год</p>
                   <p className="text-xs">Доходы отображаются из оплат через ЮКассу</p>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueData} margin={{ top: 0, right: 0, left: -5, bottom: 0 }}>
+                  <BarChart data={revenueChartData} margin={{ top: 0, right: 0, left: -5, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
                     <Tooltip
-                      contentStyle={{ borderRadius: '12px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)' }}
+                      contentStyle={tooltipStyle}
                       formatter={(value: any) => [`${value.toLocaleString()} ₽`, 'Доход']}
                     />
-                    <Bar dataKey="amount" fill="var(--color-primary)" radius={[6, 6, 0, 0]} barSize={40} />
+                    <Bar dataKey="amount" fill="var(--color-primary)" radius={[6, 6, 0, 0]} barSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               )
