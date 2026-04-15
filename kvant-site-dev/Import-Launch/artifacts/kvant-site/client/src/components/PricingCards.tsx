@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react"; // useRef kept for useAnimLoop
 import { botLink, BOT_URL } from "@/lib/bot";
 
 function AtomIcon({ animated = false }: { animated?: boolean }) {
@@ -883,19 +883,8 @@ function PricingCard({ plan, isLoggedIn, count = 0, onAdd, onRemove }: {
 
 export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [consentChecked, setConsentChecked] = useState(false);
-  const [consentError, setConsentError] = useState(false);
-  const consentRef = useRef<HTMLLabelElement>(null);
 
   const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
-
-  const checkConsent = (): boolean => {
-    if (consentChecked) return true;
-    setConsentError(true);
-    setTimeout(() => setConsentError(false), 3000);
-    consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    return false;
-  };
 
   const addToCart = (planId: string) =>
     setCart(c => ({ ...c, [planId]: (c[planId] || 0) + 1 }));
@@ -908,14 +897,13 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
     });
 
   const handleCheckout = () => {
-    if (!checkConsent()) return;
     localStorage.setItem("pricing_cart", JSON.stringify(cart));
     window.location.href = "/cabinet?tab=order";
   };
 
   const lessonWord = (n: number) => n === 1 ? "занятие" : n < 5 ? "занятия" : "занятий";
 
-  const showBar = isLoggedIn && (totalItems > 0 || consentError);
+  const showBar = isLoggedIn && totalItems > 0;
 
   return (
     <>
@@ -923,8 +911,6 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
         @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
         .pc-icon-float { animation: float 3s ease-in-out infinite; }
         .pc-card-lift { transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.35s ease; }
-        @keyframes consent-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
-        .consent-shake { animation: consent-shake 0.4s ease; }
       `}</style>
 
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
@@ -938,7 +924,7 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
               plan={plan}
               isLoggedIn={isLoggedIn}
               count={cart[plan.id] || 0}
-              onAdd={() => { if (checkConsent()) addToCart(plan.id); }}
+              onAdd={() => addToCart(plan.id)}
               onRemove={() => removeFromCart(plan.id)}
             />
           ))}
@@ -946,42 +932,19 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
       </div>
 
       {showBar && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-stretch gap-3 bg-indigo-600 text-white px-6 py-4 rounded-2xl shadow-2xl border border-indigo-500 animate-in slide-in-from-bottom-4 max-w-lg w-[calc(100vw-32px)]">
-          <label
-            ref={consentRef}
-            className={`flex items-start gap-2.5 cursor-pointer group ${consentError ? "consent-shake" : ""}`}
-            key={consentError ? "error" : "ok"}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-indigo-600 text-white px-6 py-4 rounded-2xl shadow-2xl border border-indigo-500 animate-in slide-in-from-bottom-4 max-w-lg w-[calc(100vw-32px)]">
+          <svg className="w-4 h-4 opacity-80 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span className="text-sm font-semibold flex-1 whitespace-nowrap">
+            В корзине: <span className="font-black">{totalItems}</span> {lessonWord(totalItems)}
+          </span>
+          <button
+            onClick={handleCheckout}
+            className="bg-white text-indigo-700 px-4 py-1.5 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all whitespace-nowrap shadow-sm"
           >
-            <input
-              type="checkbox"
-              checked={consentChecked}
-              onChange={e => { setConsentChecked(e.target.checked); if (e.target.checked) setConsentError(false); }}
-              className="mt-0.5 w-4 h-4 flex-shrink-0 rounded accent-white cursor-pointer"
-            />
-            <span className={`text-xs leading-snug transition-colors ${consentError ? "text-red-200 font-semibold" : "text-indigo-100 group-hover:text-white"}`}>
-              {consentError && "⚠ "}Я согласен с обработкой персональных данных в соответствии с{" "}
-              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white" onClick={e => e.stopPropagation()}>
-                Политикой конфиденциальности
-              </a>
-            </span>
-          </label>
-
-          {totalItems > 0 && (
-            <div className="flex items-center gap-3">
-              <svg className="w-4 h-4 opacity-80 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <span className="text-sm font-semibold flex-1 whitespace-nowrap">
-                В корзине: <span className="font-black">{totalItems}</span> {lessonWord(totalItems)}
-              </span>
-              <button
-                onClick={handleCheckout}
-                className="bg-white text-indigo-700 px-4 py-1.5 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all whitespace-nowrap shadow-sm"
-              >
-                Перейти к оформлению →
-              </button>
-            </div>
-          )}
+            Перейти к оформлению →
+          </button>
         </div>
       )}
     </>

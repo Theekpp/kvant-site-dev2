@@ -139,6 +139,7 @@ export default function Cabinet() {
   const [orderCart, setOrderCart] = useState<Record<string, number>>({});
   const [orderLoading, setOrderLoading] = useState(false);
   const [payAllLoading, setPayAllLoading] = useState(false);
+  const [payConsentChecked, setPayConsentChecked] = useState(false);
 
   const totalOrderItems = Object.values(orderCart).reduce((a, b) => a + b, 0);
 
@@ -561,6 +562,23 @@ export default function Cabinet() {
               </button>
             </div>
 
+            {subscriptions.some(s => !s.isPaid) && (
+              <label className="flex items-start gap-2.5 cursor-pointer group bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={payConsentChecked}
+                  onChange={e => setPayConsentChecked(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 flex-shrink-0 rounded accent-indigo-600 cursor-pointer"
+                />
+                <span className="text-xs text-slate-500 leading-snug group-hover:text-slate-700 transition-colors">
+                  Я согласен с обработкой персональных данных в соответствии с{" "}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline underline-offset-2 hover:text-indigo-800" onClick={e => e.stopPropagation()}>
+                    Политикой конфиденциальности
+                  </a>
+                </span>
+              </label>
+            )}
+
             {subscriptions.filter(s => !s.isPaid).length > 1 && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
@@ -578,7 +596,7 @@ export default function Cabinet() {
                 </div>
                 <button
                   onClick={() => handlePayAll(subscriptions.filter(s => !s.isPaid))}
-                  disabled={payAllLoading}
+                  disabled={payAllLoading || !payConsentChecked}
                   className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-semibold py-2.5 px-5 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {payAllLoading ? (
@@ -666,7 +684,7 @@ export default function Cabinet() {
                         <div className="mt-4 flex flex-col gap-2">
                           <button
                             onClick={() => handlePaySubscription(sub.id)}
-                            disabled={paymentLoading === sub.id || checkStatusLoading === sub.id}
+                            disabled={paymentLoading === sub.id || checkStatusLoading === sub.id || !payConsentChecked}
                             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
                           >
                             {paymentLoading === sub.id ? (
@@ -802,10 +820,24 @@ export default function Cabinet() {
                     {totalOrderPrice.toLocaleString("ru-RU")} ₽
                   </span>
                 </div>
-                <div>
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-start gap-2.5 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={payConsentChecked}
+                      onChange={e => setPayConsentChecked(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 flex-shrink-0 rounded accent-indigo-600 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-500 leading-snug group-hover:text-slate-700 transition-colors">
+                      Я согласен с обработкой персональных данных в соответствии с{" "}
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline underline-offset-2 hover:text-indigo-800">
+                        Политикой конфиденциальности
+                      </a>
+                    </span>
+                  </label>
                   <button
                     onClick={handleOrderCheckout}
-                    disabled={orderLoading}
+                    disabled={orderLoading || !payConsentChecked}
                     className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {orderLoading ? (
