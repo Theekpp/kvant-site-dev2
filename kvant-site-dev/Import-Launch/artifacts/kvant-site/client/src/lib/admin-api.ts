@@ -102,3 +102,44 @@ export function useDeleteScheduleSlot() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/schedule"] }),
   });
 }
+
+export function useGetPublicReviews() {
+  return useQuery({ queryKey: ["/api/reviews"], queryFn: () => adminFetch("/api/reviews") });
+}
+
+export function useGetAdminReviews() {
+  return useQuery({ queryKey: ["/api/admin/reviews"], queryFn: () => adminFetch("/api/admin/reviews") });
+}
+
+export function useCreateReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ data }: { data: any }) => adminFetch("/api/admin/reviews", { method: "POST", body: data }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
+      qc.invalidateQueries({ queryKey: ["/api/reviews"] });
+    },
+  });
+}
+
+export function useUpdateReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => adminFetch(`/api/admin/reviews/${id}`, { method: "PATCH", body: data }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
+      qc.invalidateQueries({ queryKey: ["/api/reviews"] });
+    },
+  });
+}
+
+export function useDeleteReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/reviews/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
+      qc.invalidateQueries({ queryKey: ["/api/reviews"] });
+    },
+  });
+}

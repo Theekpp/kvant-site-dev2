@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { registerAuthRoutes } from "./auth";
 import { registerAdminRoutes } from "./admin";
+import { seedReviews } from "./seed";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -9,5 +10,6 @@ export async function registerRoutes(
 ): Promise<Server> {
   registerAuthRoutes(app);
   registerAdminRoutes(app);
+  await seedReviews();
   return httpServer;
 }

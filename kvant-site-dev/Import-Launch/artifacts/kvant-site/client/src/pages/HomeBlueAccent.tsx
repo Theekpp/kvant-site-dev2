@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Rocket, Atom, Award, Magnet, ArrowRight, CheckCircle, Menu, X, Star, LogIn, FlaskConical } from "lucide-react";
+import { Rocket, Atom, Award, Magnet, ArrowRight, CheckCircle, Menu, X, Star, LogIn, FlaskConical, ChevronLeft, ChevronRight } from "lucide-react";
+import { useGetPublicReviews } from "@/lib/admin-api";
 import PricingCards from "@/components/PricingCards";
 import { BOT_URL } from "@/lib/bot";
 import { motion, AnimatePresence } from "framer-motion";
@@ -39,6 +40,16 @@ export default function HomeBlueAccent() {
       tryRefreshToken().then((ok) => checkAuth(ok));
     }
   }, []);
+
+  const { data: reviewsList = [] } = useGetPublicReviews();
+  const reviewsTrackRef = useRef<HTMLDivElement>(null);
+
+  const scrollReviews = (dir: "left" | "right") => {
+    if (!reviewsTrackRef.current) return;
+    const card = reviewsTrackRef.current.children[0] as HTMLElement | undefined;
+    const cardW = card ? card.offsetWidth + 24 : 336;
+    reviewsTrackRef.current.scrollBy({ left: dir === "left" ? -cardW : cardW, behavior: "smooth" });
+  };
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -661,49 +672,57 @@ export default function HomeBlueAccent() {
             <h2 className="font-display text-4xl md:text-5xl font-bold mb-4 text-slate-900">Отзывы учеников</h2>
             <div className="w-20 h-1 bg-[#4F46E5] mx-auto rounded-full"></div>
           </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                name: "Анна С.",
-                grade: "11 класс",
-                text: "Благодаря занятиям с Кириллом, физика стала моим любимым предметом. Сдала ЕГЭ на 89 баллов, хотя в начале года писала пробники на 45. Очень понятное объяснение сложных тем!",
-                rating: 5
-              },
-              {
-                name: "Михаил В.",
-                grade: "10 класс",
-                text: "Отличный преподаватель! Умеет заинтересовать предметом. Формулы больше не кажутся набором букв, теперь я понимаю откуда они берутся и как работают в реальной жизни.",
-                rating: 5
-              },
-              {
-                name: "Елена (мама Игоря)",
-                grade: "9 класс",
-                text: "Сын начал заниматься за полгода до ОГЭ. Результат - твердая пятерка. Кирилл всегда на связи, дает подробную обратную связь по домашним заданиям. Рекомендую!",
-                rating: 5
-              }
-            ].map((review, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-[#F5F7FF] rounded-[24px] p-8 border border-slate-100 shadow-sm"
+
+          {reviewsList.length === 0 ? (
+            <p className="text-center text-slate-400">Отзывы загружаются...</p>
+          ) : (
+            <div className="relative">
+              <button
+                onClick={() => scrollReviews("left")}
+                aria-label="Предыдущие отзывы"
+                className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 bg-white border border-slate-200 rounded-full w-10 h-10 flex items-center justify-center shadow-md hover:bg-slate-50 transition-colors"
               >
-                <div className="flex gap-1 mb-4 text-yellow-400">
-                  {[...Array(review.rating)].map((_, j) => (
-                    <Star key={j} className="w-5 h-5 fill-current" />
-                  ))}
-                </div>
-                <p className="text-slate-700 leading-loose mb-6 italic">«{review.text}»</p>
-                <div>
-                  <div className="font-bold text-slate-900">{review.name}</div>
-                  <div className="text-sm text-slate-500">{review.grade}</div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                <ChevronLeft className="w-5 h-5 text-slate-600" />
+              </button>
+
+              <div
+                ref={reviewsTrackRef}
+                className="flex gap-6 overflow-x-auto pb-4 px-1"
+                style={{ scrollbarWidth: "none" } as any}
+              >
+                {reviewsList.map((review: any, i: number) => (
+                  <motion.div
+                    key={review.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: Math.min(i, 3) * 0.08 }}
+                    className="bg-[#F5F7FF] rounded-[24px] p-8 border border-slate-100 shadow-sm flex-shrink-0"
+                    style={{ width: "clamp(280px, 30vw, 360px)" }}
+                  >
+                    <div className="flex gap-1 mb-4 text-yellow-400">
+                      {[...Array(review.rating)].map((_: any, j: number) => (
+                        <Star key={j} className="w-5 h-5 fill-current" />
+                      ))}
+                    </div>
+                    <p className="text-slate-700 leading-loose mb-6 italic">«{review.text}»</p>
+                    <div>
+                      <div className="font-bold text-slate-900">{review.name}</div>
+                      <div className="text-sm text-slate-500">{review.subject} · {review.date}</div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => scrollReviews("right")}
+                aria-label="Следующие отзывы"
+                className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 bg-white border border-slate-200 rounded-full w-10 h-10 flex items-center justify-center shadow-md hover:bg-slate-50 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-slate-600" />
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

@@ -6,7 +6,8 @@ import {
   ListCheck,
   CreditCard,
   GraduationCap,
-  Banknote
+  Banknote,
+  Star
 } from "lucide-react";
 import {
   Sidebar,
@@ -27,6 +28,7 @@ const navItems = [
   { title: "Ученики",     url: "/admin/students",      icon: Users },
   { title: "Абонементы",  url: "/admin/subscriptions", icon: CreditCard },
   { title: "Оплаты",      url: "/admin/payments",      icon: Banknote },
+  { title: "Отзывы",      url: "/admin/reviews",       icon: Star },
 ];
 
 export function AppSidebar() {

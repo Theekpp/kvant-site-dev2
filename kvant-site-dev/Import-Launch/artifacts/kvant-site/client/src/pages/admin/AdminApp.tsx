@@ -6,6 +6,7 @@ import Schedule from "./Schedule";
 import Students from "./Students";
 import Subscriptions from "./Subscriptions";
 import Payments from "./Payments";
+import Reviews from "./Reviews";
 
 export default function AdminApp() {
   return (
@@ -17,6 +18,7 @@ export default function AdminApp() {
         <Route path="/admin/students" component={Students} />
         <Route path="/admin/subscriptions" component={Subscriptions} />
         <Route path="/admin/payments" component={Payments} />
+        <Route path="/admin/reviews" component={Reviews} />
       </Switch>
     </AppLayout>
   );
