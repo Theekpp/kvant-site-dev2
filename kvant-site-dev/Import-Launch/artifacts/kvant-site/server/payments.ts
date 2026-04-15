@@ -99,7 +99,6 @@ export function registerPaymentRoutes(app: Express) {
           subscriptionId: String(subscriptionId),
           accountId: String(account.id),
         },
-        notification_url: `${FRONTEND_URL}/api/yookassa/webhook`,
       }, idempotenceKey);
 
       await db.insert(payments).values({
