@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser } from "@/lib/admin-api";
+import { useGetUsers, useCreateUser, useGetUserDetails } from "@/lib/admin-api";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserCircle2, UserPlus } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { UserCircle2, UserPlus, Phone, ExternalLink, CalendarCheck, CreditCard, Banknote, Clock } from "lucide-react";
+import { format, parseISO, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
 
 const GRADES = ["7", "8", "9", "10", "11", "Студент", "Другое"];
@@ -33,6 +35,165 @@ const DEFAULT_FORM: StudentForm = {
   phone: "", telegramUsername: "", telegramId: ""
 };
 
+function StudentCard({ userId, onClose }: { userId: number; onClose: () => void }) {
+  const { data, isLoading } = useGetUserDetails(userId);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { user, bookings, subscriptions, totalPaid, lastBotActivity } = data;
+  const sortedBookings = [...(bookings || [])].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const activeSubs = (subscriptions || []).filter((s: any) => s.isPaid && s.status !== 'cancelled');
+  const lastBooking = sortedBookings[0];
+  const daysSinceLastBooking = lastBooking
+    ? differenceInDays(new Date(), parseISO(lastBooking.createdAt))
+    : null;
+
+  return (
+    <div className="space-y-6 py-2">
+      {/* Header info */}
+      <div className="flex items-center gap-4">
+        <div className="h-16 w-16 bg-primary/10 rounded-2xl flex items-center justify-center">
+          <UserCircle2 className="h-9 w-9 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xl font-bold">{user.firstName} {user.lastName || ''}</h3>
+          <div className="flex flex-wrap gap-2 mt-1.5">
+            {user.grade && <Badge variant="secondary" className="text-xs no-default-active-elevate">{user.grade} кл.</Badge>}
+            {user.goal && <Badge variant="outline" className="text-xs no-default-active-elevate">{user.goal}</Badge>}
+            {user.age && <span className="text-sm text-muted-foreground">{user.age} лет</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-primary/5 border border-primary/10 p-3 text-center">
+          <div className="text-2xl font-bold text-primary">{bookings?.length || 0}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Занятий</div>
+        </div>
+        <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/10 p-3 text-center">
+          <div className="text-2xl font-bold text-emerald-600">{activeSubs.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Абонементов</div>
+        </div>
+        <div className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 text-center">
+          <div className="text-2xl font-bold text-amber-600">{Math.round(totalPaid || 0).toLocaleString()} ₽</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Оплачено</div>
+        </div>
+      </div>
+
+      {/* Contact + activity */}
+      <div className="space-y-2 text-sm">
+        {user.phone && (
+          <div className="flex items-center gap-2">
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            <a href={`tel:${user.phone}`} className="text-primary hover:underline">{user.phone}</a>
+          </div>
+        )}
+        {user.telegramUsername && (
+          <div className="flex items-center gap-2">
+            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            <a href={`https://t.me/${user.telegramUsername}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+              @{user.telegramUsername}
+            </a>
+          </div>
+        )}
+        {lastBotActivity && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Последняя активность в боте: {format(new Date(lastBotActivity), 'd MMM yyyy', { locale: ru })}</span>
+          </div>
+        )}
+        {daysSinceLastBooking !== null && (
+          <div className={`flex items-center gap-2 ${daysSinceLastBooking > 14 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+            <CalendarCheck className="h-4 w-4" />
+            <span>
+              Последнее занятие: {lastBooking.date}
+              {daysSinceLastBooking > 14 && ` (${daysSinceLastBooking} дней назад)`}
+            </span>
+          </div>
+        )}
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <UserCircle2 className="h-4 w-4" />
+          <span>Зарегистрирован {format(parseISO(user.createdAt), 'd MMMM yyyy', { locale: ru })}</span>
+        </div>
+      </div>
+
+      {/* Tabs with bookings and subscriptions */}
+      <Tabs defaultValue="bookings">
+        <TabsList className="w-full">
+          <TabsTrigger value="bookings" className="flex-1 gap-1.5">
+            <CalendarCheck className="h-3.5 w-3.5" />
+            Занятия ({bookings?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="subs" className="flex-1 gap-1.5">
+            <CreditCard className="h-3.5 w-3.5" />
+            Абонементы ({subscriptions?.length || 0})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="bookings" className="mt-3">
+          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            {sortedBookings.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Нет занятий</p>
+            ) : sortedBookings.slice(0, 20).map((b: any) => (
+              <div key={b.id} className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
+                <div>
+                  <span className="text-sm font-medium">{b.date}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{b.time}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className={`text-xs no-default-active-elevate ${
+                    b.status === 'completed' ? 'text-emerald-700 border-emerald-200' :
+                    b.status === 'cancelled' ? 'text-red-500 border-red-200' :
+                    b.status === 'confirmed' ? 'text-blue-700 border-blue-200' : 'text-amber-600 border-amber-200'
+                  }`}>
+                    {b.status === 'pending' ? 'Ожидает' : b.status === 'confirmed' ? 'Подтв.' : b.status === 'completed' ? 'Завершено' : 'Отменено'}
+                  </Badge>
+                  {b.isPaid && <Banknote className="h-3.5 w-3.5 text-emerald-600" />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="subs" className="mt-3">
+          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            {(subscriptions || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Нет абонементов</p>
+            ) : (subscriptions || []).map((s: any) => (
+              <div key={s.id} className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
+                <div>
+                  <span className="text-sm font-medium">{s.type === 'individual' ? 'Инд.' : 'Груп.'}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{format(parseISO(s.createdAt), 'd MMM yy', { locale: ru })}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-bold ${s.remainingLessons === 0 ? 'text-red-500' : 'text-primary'}`}>
+                    {s.remainingLessons}/{s.totalLessons}
+                  </span>
+                  <Badge variant="outline" className={`text-xs no-default-active-elevate ${
+                    s.status === 'cancelled' ? 'text-red-500 border-red-200' :
+                    s.isPaid ? 'text-emerald-700 border-emerald-200' : 'text-amber-700 border-amber-200'
+                  }`}>
+                    {s.status === 'cancelled' ? 'Отменён' : s.isPaid ? 'Активен' : 'Ожидает'}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
 export default function Students() {
   const { data: users, isLoading } = useGetUsers();
   const createUser = useCreateUser();
@@ -40,17 +201,14 @@ export default function Students() {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<StudentForm>(DEFAULT_FORM);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   const handleSubmit = () => {
     if (!form.firstName.trim()) {
       toast({ title: "Введите имя ученика", variant: "destructive" });
       return;
     }
-
-    const telegramId = form.telegramId
-      ? parseInt(form.telegramId)
-      : -(Date.now());
-
+    const telegramId = form.telegramId ? parseInt(form.telegramId) : -(Date.now());
     createUser.mutate({
       data: {
         telegramId,
@@ -64,7 +222,7 @@ export default function Students() {
       }
     }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
         toast({ title: "Ученик добавлен" });
         setIsOpen(false);
         setForm(DEFAULT_FORM);
@@ -87,7 +245,7 @@ export default function Students() {
     );
   }
 
-  const sortedUsers = [...(users || [])].sort((a, b) =>
+  const sortedUsers = [...(users || [])].sort((a: any, b: any) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
@@ -120,11 +278,15 @@ export default function Students() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedUsers.map((user) => (
-                  <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
+                sortedUsers.map((user: any) => (
+                  <TableRow
+                    key={user.id}
+                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => setSelectedUserId(user.id)}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary shrink-0">
                           <UserCircle2 className="h-6 w-6" />
                         </div>
                         <div className="flex flex-col">
@@ -152,12 +314,12 @@ export default function Students() {
                     <TableCell>
                       <div className="flex flex-col text-sm">
                         {user.phone ? (
-                          <a href={`tel:${user.phone}`} className="text-primary hover:underline">{user.phone}</a>
+                          <a href={`tel:${user.phone}`} className="text-primary hover:underline" onClick={e => e.stopPropagation()}>{user.phone}</a>
                         ) : (
                           <span className="text-muted-foreground">Нет телефона</span>
                         )}
                         {user.telegramUsername && (
-                          <a href={`https://t.me/${user.telegramUsername}`} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                          <a href={`https://t.me/${user.telegramUsername}`} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" onClick={e => e.stopPropagation()}>
                             @{user.telegramUsername}
                           </a>
                         )}
@@ -174,6 +336,20 @@ export default function Students() {
         </div>
       </Card>
 
+      {/* Student card sheet */}
+      <Sheet open={selectedUserId !== null} onOpenChange={open => { if (!open) setSelectedUserId(null); }}>
+        <SheetContent className="sm:max-w-[480px] overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Карточка ученика</SheetTitle>
+            <SheetDescription>Детальная информация, занятия и абонементы</SheetDescription>
+          </SheetHeader>
+          {selectedUserId !== null && (
+            <StudentCard userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Add student dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>

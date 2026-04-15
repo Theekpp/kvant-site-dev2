@@ -7,7 +7,8 @@ import {
   CreditCard,
   GraduationCap,
   Banknote,
-  Star
+  Star,
+  History
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +30,7 @@ const navItems = [
   { title: "Абонементы",  url: "/admin/subscriptions", icon: CreditCard },
   { title: "Оплаты",      url: "/admin/payments",      icon: Banknote },
   { title: "Отзывы",      url: "/admin/reviews",       icon: Star },
+  { title: "История",     url: "/admin/history",       icon: History },
 ];
 
 export function AppSidebar() {

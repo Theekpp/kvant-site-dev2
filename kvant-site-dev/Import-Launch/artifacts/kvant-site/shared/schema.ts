@@ -52,6 +52,7 @@ export const bookings = pgTable("bookings", {
   time: text("time").notNull(),
   status: text("status").notNull().default("confirmed"),
   isPaid: boolean("is_paid").notNull().default(false),
+  paymentMethod: text("payment_method"),
   groupScheduleId: integer("group_schedule_id"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
@@ -63,6 +64,7 @@ export const subscriptions = pgTable("subscriptions", {
   totalLessons: integer("total_lessons").notNull().default(8),
   remainingLessons: integer("remaining_lessons").notNull().default(8),
   isPaid: boolean("is_paid").notNull().default(false),
+  status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -114,6 +116,23 @@ export const refunds = pgTable("refunds", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+export const adminActions = pgTable("admin_actions", {
+  id: serial("id").primaryKey(),
+  action: text("action").notNull(),
+  entity: text("entity").notNull(),
+  entityId: integer("entity_id"),
+  details: text("details"),
+  performedBy: text("performed_by"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const botActivity = pgTable("bot_activity", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: text("date").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
@@ -122,3 +141,5 @@ export type ScheduleSlot = typeof scheduleSlots.$inferSelect;
 export type Review = typeof reviews.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type Refund = typeof refunds.$inferSelect;
+export type AdminAction = typeof adminActions.$inferSelect;
+export type BotActivity = typeof botActivity.$inferSelect;

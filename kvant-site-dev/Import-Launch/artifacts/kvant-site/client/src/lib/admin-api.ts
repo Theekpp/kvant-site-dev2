@@ -20,6 +20,14 @@ export function useCreateUser() {
   });
 }
 
+export function useGetUserDetails(id: number | null) {
+  return useQuery({
+    queryKey: ["/api/admin/users", id, "details"],
+    queryFn: () => adminFetch(`/api/admin/users/${id}/details`),
+    enabled: id !== null,
+  });
+}
+
 export function useGetBookings() {
   return useQuery({ queryKey: ["/api/admin/bookings"], queryFn: () => adminFetch("/api/admin/bookings") });
 }
@@ -44,7 +52,11 @@ export function useMarkBookingPaid() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => adminFetch(`/api/admin/bookings/${id}`, { method: "PATCH", body: data }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/bookings"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
   });
 }
 
@@ -63,7 +75,10 @@ export function useCreateSubscription() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ data }: { data: any }) => adminFetch("/api/admin/subscriptions", { method: "POST", body: data }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
   });
 }
 
@@ -71,15 +86,10 @@ export function useMarkSubscriptionPaid() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/subscriptions/${id}/paid`, { method: "PATCH" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] }),
-  });
-}
-
-export function useRefundSubscription() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/subscriptions/${id}/refund`, { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
   });
 }
 
@@ -87,7 +97,45 @@ export function useMarkSubPaid() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/subscriptions/${id}/paid`, { method: "PATCH" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
+  });
+}
+
+export function useAdjustSubscriptionLessons() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, delta, reason }: { id: number; delta: number; reason?: string }) =>
+      adminFetch(`/api/admin/subscriptions/${id}/adjust`, { method: "PATCH", body: { delta, reason } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
+  });
+}
+
+export function useCancelSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      adminFetch(`/api/admin/subscriptions/${id}/cancel`, { method: "PATCH", body: { reason } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
+  });
+}
+
+export function useRefundSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/subscriptions/${id}/refund`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
   });
 }
 
@@ -99,7 +147,10 @@ export function useCreateScheduleSlot() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ data }: { data: any }) => adminFetch("/api/admin/schedule", { method: "POST", body: data }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/schedule"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/schedule"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
   });
 }
 
@@ -107,7 +158,10 @@ export function useDeleteScheduleSlot() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/schedule/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/schedule"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/schedule"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
+    },
   });
 }
 
@@ -126,6 +180,7 @@ export function useCreateReview() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
       qc.invalidateQueries({ queryKey: ["/api/reviews"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
     },
   });
 }
@@ -137,6 +192,7 @@ export function useUpdateReview() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
       qc.invalidateQueries({ queryKey: ["/api/reviews"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
     },
   });
 }
@@ -148,6 +204,22 @@ export function useDeleteReview() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
       qc.invalidateQueries({ queryKey: ["/api/reviews"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/actions"] });
     },
+  });
+}
+
+export function useGetAdminActions(page = 1, limit = 50) {
+  return useQuery({
+    queryKey: ["/api/admin/actions", page, limit],
+    queryFn: () => adminFetch(`/api/admin/actions?page=${page}&limit=${limit}`),
+  });
+}
+
+export function useGetAnalytics() {
+  return useQuery({
+    queryKey: ["/api/admin/analytics"],
+    queryFn: () => adminFetch("/api/admin/analytics"),
+    staleTime: 60_000,
   });
 }

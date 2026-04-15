@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   useGetBookings, useUpdateBookingStatus, useNotifyUser, useMarkBookingPaid,
-  useGetUsers, useCreateBooking
+  useGetUsers, useCreateBooking, useGetSubscriptions
 } from "@/lib/admin-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,21 +18,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Bell, CheckCircle, XCircle, Clock, AlertCircle, Banknote, BanknoteIcon, Plus } from "lucide-react";
+import { MoreHorizontal, Bell, CheckCircle, XCircle, Clock, AlertCircle, Banknote, BanknoteIcon, Plus, CreditCard, Gift } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
 const STATUS_MAP: Record<string, { label: string, color: string, icon: any }> = {
-  pending:   { label: "Ожидает",     color: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300",     icon: AlertCircle },
+  pending:   { label: "Ожидает",      color: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300",     icon: AlertCircle },
   confirmed: { label: "Подтверждено", color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300",           icon: Clock },
-  completed: { label: "Завершено",   color: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300", icon: CheckCircle },
-  cancelled: { label: "Отменено",    color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",                 icon: XCircle },
+  completed: { label: "Завершено",    color: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300", icon: CheckCircle },
+  cancelled: { label: "Отменено",     color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",                 icon: XCircle },
 };
 
-const TYPE_MAP: Record<string, string> = {
-  individual: "Индивидуальное",
-  group: "Групповое"
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  subscription: "Абонемент",
+  external: "Внешняя оплата",
+  gift: "Подарок",
 };
 
 interface BookingForm {
@@ -50,9 +52,17 @@ const DEFAULT_FORM: BookingForm = {
 
 const TIME_PRESETS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
 
+interface PaymentMethodState {
+  open: boolean;
+  bookingId: number | null;
+  userId: number | null;
+  currentIsPaid: boolean;
+}
+
 export default function Bookings() {
   const { data: bookings, isLoading } = useGetBookings();
   const { data: users } = useGetUsers();
+  const { data: subscriptions } = useGetSubscriptions();
   const updateStatus = useUpdateBookingStatus();
   const markPaid = useMarkBookingPaid();
   const notifyUser = useNotifyUser();
@@ -66,23 +76,59 @@ export default function Bookings() {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [form, setForm] = useState<BookingForm>(DEFAULT_FORM);
 
+  const [paymentState, setPaymentState] = useState<PaymentMethodState>({
+    open: false, bookingId: null, userId: null, currentIsPaid: false
+  });
+  const [paymentMethod, setPaymentMethod] = useState<string>("external");
+  const [selectedSubId, setSelectedSubId] = useState<string>("");
+
   const handleStatusChange = (id: number, status: string) => {
     updateStatus.mutate({ id, data: { status } }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
         toast({ title: "Статус обновлён" });
       },
       onError: () => toast({ title: "Ошибка обновления статуса", variant: "destructive" })
     });
   };
 
-  const handleTogglePaid = (id: number, isPaid: boolean) => {
-    markPaid.mutate({ id, data: { isPaid: !isPaid } }, {
+  const openPaymentDialog = (bookingId: number, userId: number, currentIsPaid: boolean) => {
+    if (currentIsPaid) {
+      markPaid.mutate({ id: bookingId, data: { isPaid: false, paymentMethod: null } }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+          toast({ title: "Оплата снята" });
+        },
+        onError: () => toast({ title: "Ошибка", variant: "destructive" })
+      });
+      return;
+    }
+    setPaymentState({ open: true, bookingId, userId, currentIsPaid });
+    setPaymentMethod("external");
+    setSelectedSubId("");
+  };
+
+  const handleConfirmPayment = () => {
+    if (!paymentState.bookingId) return;
+    if (paymentMethod === "subscription" && !selectedSubId) {
+      toast({ title: "Выберите абонемент", variant: "destructive" });
+      return;
+    }
+    markPaid.mutate({
+      id: paymentState.bookingId,
+      data: {
+        isPaid: true,
+        paymentMethod,
+        subscriptionId: paymentMethod === "subscription" ? parseInt(selectedSubId) : undefined,
+      }
+    }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-        toast({ title: !isPaid ? "Оплата отмечена" : "Оплата снята" });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+        toast({ title: "Оплата отмечена" });
+        setPaymentState({ open: false, bookingId: null, userId: null, currentIsPaid: false });
       },
-      onError: () => toast({ title: "Ошибка обновления оплаты", variant: "destructive" })
+      onError: () => toast({ title: "Ошибка", variant: "destructive" })
     });
   };
 
@@ -117,7 +163,7 @@ export default function Bookings() {
       }
     }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
         toast({ title: "Запись создана" });
         setIsBookingOpen(false);
         setForm(DEFAULT_FORM);
@@ -125,6 +171,12 @@ export default function Bookings() {
       onError: () => toast({ title: "Ошибка создания записи", variant: "destructive" })
     });
   };
+
+  const userActiveSubs = paymentState.userId
+    ? (subscriptions || []).filter((s: any) =>
+        s.userId === paymentState.userId && s.isPaid && s.remainingLessons > 0 && s.status !== 'cancelled'
+      )
+    : [];
 
   if (isLoading) {
     return (
@@ -137,7 +189,7 @@ export default function Bookings() {
     );
   }
 
-  const sortedBookings = [...(bookings || [])].sort((a, b) =>
+  const sortedBookings = [...(bookings || [])].sort((a: any, b: any) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
@@ -154,11 +206,11 @@ export default function Bookings() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="w-[35%]">Ученик</TableHead>
+              <TableHead className="w-[33%]">Ученик</TableHead>
               <TableHead className="w-[15%]">Дата</TableHead>
-              <TableHead className="w-[15%] hidden sm:table-cell">Тип</TableHead>
-              <TableHead className="w-[20%]">Статус / Оплата</TableHead>
-              <TableHead className="w-[15%] text-right">Действия</TableHead>
+              <TableHead className="w-[12%] hidden sm:table-cell">Тип</TableHead>
+              <TableHead className="w-[22%]">Статус / Оплата</TableHead>
+              <TableHead className="w-[18%] text-right">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,7 +219,7 @@ export default function Bookings() {
                 <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">Нет записей</TableCell>
               </TableRow>
             ) : (
-              sortedBookings.map((booking) => {
+              sortedBookings.map((booking: any) => {
                 const StatusIcon = STATUS_MAP[booking.status]?.icon || Clock;
                 return (
                   <TableRow key={booking.id} className="hover:bg-muted/30 transition-colors">
@@ -203,11 +255,13 @@ export default function Bookings() {
                         </Badge>
                         <Badge
                           variant="outline"
-                          onClick={() => handleTogglePaid(booking.id, booking.isPaid)}
+                          onClick={() => openPaymentDialog(booking.id, booking.userId, booking.isPaid)}
                           className={`gap-1 text-xs py-0.5 px-1.5 cursor-pointer no-default-active-elevate w-fit ${booking.isPaid ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
                         >
                           <Banknote className="w-3 h-3 shrink-0" />
-                          {booking.isPaid ? 'Оплач.' : 'Не опл.'}
+                          {booking.isPaid
+                            ? `Опл. · ${PAYMENT_METHOD_LABELS[booking.paymentMethod] || ''}`
+                            : 'Не опл.'}
                         </Badge>
                       </div>
                     </TableCell>
@@ -218,7 +272,7 @@ export default function Bookings() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48" sideOffset={4}>
+                        <DropdownMenuContent align="end" className="w-52" sideOffset={4}>
                           <DropdownMenuLabel>Изменить статус</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'pending')} disabled={booking.status === 'pending'}>
                             <AlertCircle className="mr-2 h-4 w-4 text-amber-500" /> Ожидает
@@ -233,7 +287,7 @@ export default function Bookings() {
                             <XCircle className="mr-2 h-4 w-4 text-red-500" /> Отменить
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleTogglePaid(booking.id, booking.isPaid)}>
+                          <DropdownMenuItem onClick={() => openPaymentDialog(booking.id, booking.userId, booking.isPaid)}>
                             <BanknoteIcon className="mr-2 h-4 w-4 text-green-500" />
                             {booking.isPaid ? 'Снять оплату' : 'Отметить оплату'}
                           </DropdownMenuItem>
@@ -256,6 +310,86 @@ export default function Bookings() {
         </Table>
       </Card>
 
+      {/* Payment method dialog */}
+      <Dialog open={paymentState.open} onOpenChange={open => { if (!open) setPaymentState(s => ({ ...s, open: false })); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Способ оплаты</DialogTitle>
+            <DialogDescription>Выберите, как была произведена оплата за это занятие.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-2">
+              <div className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${paymentMethod === 'subscription' ? 'border-primary bg-primary/5' : ''}`}
+                onClick={() => setPaymentMethod('subscription')}>
+                <RadioGroupItem value="subscription" id="pm-sub" className="mt-0.5" />
+                <Label htmlFor="pm-sub" className="cursor-pointer flex-1">
+                  <div className="flex items-center gap-2 font-medium">
+                    <CreditCard className="h-4 w-4 text-blue-600" />
+                    Списание с абонемента
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Вычесть занятие из активного абонемента ученика</p>
+                </Label>
+              </div>
+              <div className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${paymentMethod === 'external' ? 'border-primary bg-primary/5' : ''}`}
+                onClick={() => setPaymentMethod('external')}>
+                <RadioGroupItem value="external" id="pm-ext" className="mt-0.5" />
+                <Label htmlFor="pm-ext" className="cursor-pointer flex-1">
+                  <div className="flex items-center gap-2 font-medium">
+                    <BanknoteIcon className="h-4 w-4 text-green-600" />
+                    Оплата вне сайта
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Наличные, перевод или другой способ оплаты</p>
+                </Label>
+              </div>
+              <div className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${paymentMethod === 'gift' ? 'border-primary bg-primary/5' : ''}`}
+                onClick={() => setPaymentMethod('gift')}>
+                <RadioGroupItem value="gift" id="pm-gift" className="mt-0.5" />
+                <Label htmlFor="pm-gift" className="cursor-pointer flex-1">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Gift className="h-4 w-4 text-purple-600" />
+                    Подарок / бесплатно
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Занятие предоставляется бесплатно</p>
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {paymentMethod === "subscription" && (
+              <div>
+                <Label className="text-sm mb-1.5 block">Выберите абонемент *</Label>
+                {userActiveSubs.length === 0 ? (
+                  <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md p-3">
+                    У этого ученика нет активных абонементов с остатком занятий.
+                  </p>
+                ) : (
+                  <Select value={selectedSubId} onValueChange={setSelectedSubId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите абонемент" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {userActiveSubs.map((s: any) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.type === 'individual' ? 'Инд.' : 'Груп.'} · {s.remainingLessons}/{s.totalLessons} занятий
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentState(s => ({ ...s, open: false }))}>Отмена</Button>
+            <Button
+              onClick={handleConfirmPayment}
+              disabled={markPaid.isPending || (paymentMethod === "subscription" && !selectedSubId)}
+            >
+              {markPaid.isPending ? "Сохранение..." : "Отметить оплаченным"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Create Booking Dialog */}
       <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
         <DialogContent className="sm:max-w-[440px]">
@@ -269,7 +403,7 @@ export default function Bookings() {
               <Select value={form.userId} onValueChange={v => setForm(f => ({ ...f, userId: v }))}>
                 <SelectTrigger><SelectValue placeholder="Выберите ученика" /></SelectTrigger>
                 <SelectContent>
-                  {(users || []).map(u => (
+                  {(users || []).map((u: any) => (
                     <SelectItem key={u.id} value={String(u.id)}>
                       {u.firstName} {u.lastName || ''} {u.telegramUsername ? `(@${u.telegramUsername})` : ''}
                     </SelectItem>
@@ -336,9 +470,7 @@ export default function Bookings() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Отправить уведомление в Telegram</DialogTitle>
-            <DialogDescription>
-              Сообщение будет отправлено напрямую ученику от имени бота.
-            </DialogDescription>
+            <DialogDescription>Сообщение будет отправлено напрямую ученику от имени бота.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Textarea

@@ -7,6 +7,7 @@ import Students from "./Students";
 import Subscriptions from "./Subscriptions";
 import Payments from "./Payments";
 import Reviews from "./Reviews";
+import History from "./History";
 
 export default function AdminApp() {
   return (
@@ -19,6 +20,7 @@ export default function AdminApp() {
         <Route path="/admin/subscriptions" component={Subscriptions} />
         <Route path="/admin/payments" component={Payments} />
         <Route path="/admin/reviews" component={Reviews} />
+        <Route path="/admin/history" component={History} />
       </Switch>
     </AppLayout>
   );
