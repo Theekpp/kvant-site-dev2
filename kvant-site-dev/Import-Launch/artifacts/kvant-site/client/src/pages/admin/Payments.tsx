@@ -1,13 +1,23 @@
 import { useState } from "react";
-import { useGetBookings, useGetSubscriptions, useMarkBookingPaid, useMarkSubscriptionPaid } from "@/lib/admin-api";
+import { useGetBookings, useGetSubscriptions, useMarkBookingPaid, useMarkSubscriptionPaid, useRefundSubscription } from "@/lib/admin-api";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Banknote, CreditCard, UserCircle2, CheckCircle2, XCircle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Banknote, CreditCard, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -21,8 +31,11 @@ export default function Payments() {
   const { data: subscriptions, isLoading: subsLoading } = useGetSubscriptions();
   const markBookingPaid = useMarkBookingPaid();
   const markSubPaid = useMarkSubscriptionPaid();
+  const refundSub = useRefundSubscription();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const [refundDialogSubId, setRefundDialogSubId] = useState<number | null>(null);
 
   const isLoading = bookingsLoading || subsLoading;
 
@@ -39,10 +52,29 @@ export default function Payments() {
   const handleMarkSubPaid = (id: number) => {
     markSubPaid.mutate({ id }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
         toast({ title: "Абонемент активирован" });
       },
       onError: () => toast({ title: "Ошибка", variant: "destructive" })
+    });
+  };
+
+  const handleRefund = () => {
+    if (refundDialogSubId === null) return;
+    refundSub.mutate({ id: refundDialogSubId }, {
+      onSuccess: (data: any) => {
+        setRefundDialogSubId(null);
+        if (data?.status === "succeeded") {
+          toast({ title: "Возврат выполнен", description: `Средства (${data.amount} ₽) возвращены покупателю` });
+        } else {
+          toast({ title: "Возврат инициирован", description: `Статус: ${data?.status || "pending"}. ЮКасса обработает возврат в ближайшее время.` });
+        }
+      },
+      onError: (err: any) => {
+        setRefundDialogSubId(null);
+        const msg = err?.response?.data?.message || "Ошибка при создании возврата";
+        toast({ title: "Ошибка возврата", description: msg, variant: "destructive" });
+      }
     });
   };
 
@@ -70,8 +102,45 @@ export default function Payments() {
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
+  const refundTargetSub = refundDialogSubId !== null
+    ? sortedSubs.find(s => s.id === refundDialogSubId)
+    : null;
+
   return (
     <div className="space-y-6">
+      <AlertDialog open={refundDialogSubId !== null} onOpenChange={open => { if (!open) setRefundDialogSubId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Подтвердить возврат средств</AlertDialogTitle>
+            <AlertDialogDescription>
+              {refundTargetSub && (
+                <>
+                  Вы собираетесь вернуть деньги за абонемент{" "}
+                  <strong>
+                    {refundTargetSub.user
+                      ? `${refundTargetSub.user.firstName || ""} ${refundTargetSub.user.lastName || ""}`.trim() || "ученика"
+                      : "ученика"}
+                  </strong>{" "}
+                  ({TYPE_MAP[refundTargetSub.type] || refundTargetSub.type}, {refundTargetSub.totalLessons} занятий).
+                  <br /><br />
+                  После возврата абонемент будет деактивирован. Это действие нельзя отменить.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={refundSub.isPending}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRefund}
+              disabled={refundSub.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {refundSub.isPending ? "Обработка..." : "Вернуть средства"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-border/50 shadow-sm">
           <CardContent className="pt-4 pb-4">
@@ -229,12 +298,12 @@ export default function Payments() {
               <Table>
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className="w-[35%]">Ученик</TableHead>
+                    <TableHead className="w-[30%]">Ученик</TableHead>
                     <TableHead className="w-[15%] hidden sm:table-cell">Тип</TableHead>
-                    <TableHead className="w-[15%]">Занятия</TableHead>
-                    <TableHead className="w-[15%] hidden sm:table-cell">Оформлен</TableHead>
+                    <TableHead className="w-[12%]">Занятия</TableHead>
+                    <TableHead className="w-[13%] hidden sm:table-cell">Оформлен</TableHead>
                     <TableHead className="w-[10%]">Статус</TableHead>
-                    <TableHead className="w-[10%] text-right">Действие</TableHead>
+                    <TableHead className="w-[20%] text-right">Действие</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -283,20 +352,31 @@ export default function Payments() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {!s.isPaid && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                            onClick={() => handleMarkSubPaid(s.id)}
-                            disabled={markSubPaid.isPending}
-                          >
-                            Активировать
-                          </Button>
-                        )}
-                        {s.isPaid && (
-                          <span className="text-xs text-muted-foreground">✓</span>
-                        )}
+                        <div className="flex items-center justify-end gap-1.5">
+                          {!s.isPaid && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => handleMarkSubPaid(s.id)}
+                              disabled={markSubPaid.isPending}
+                            >
+                              Активировать
+                            </Button>
+                          )}
+                          {s.isPaid && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50 gap-1"
+                              onClick={() => setRefundDialogSubId(s.id)}
+                              disabled={refundSub.isPending}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              Возврат
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

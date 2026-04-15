@@ -102,6 +102,18 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+export const refunds = pgTable("refunds", {
+  id: serial("id").primaryKey(),
+  paymentId: integer("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }),
+  subscriptionId: integer("subscription_id").notNull().references(() => subscriptions.id, { onDelete: "cascade" }),
+  yookassaRefundId: text("yookassa_refund_id").notNull().unique(),
+  amount: text("amount").notNull(),
+  currency: text("currency").notNull().default("RUB"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
@@ -109,3 +121,4 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type ScheduleSlot = typeof scheduleSlots.$inferSelect;
 export type Review = typeof reviews.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type Refund = typeof refunds.$inferSelect;

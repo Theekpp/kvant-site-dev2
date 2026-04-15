@@ -75,6 +75,14 @@ export function useMarkSubscriptionPaid() {
   });
 }
 
+export function useRefundSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/subscriptions/${id}/refund`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] }),
+  });
+}
+
 export function useMarkSubPaid() {
   const qc = useQueryClient();
   return useMutation({

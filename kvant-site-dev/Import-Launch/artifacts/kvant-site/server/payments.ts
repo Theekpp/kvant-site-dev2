@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { db } from "./db";
-import { accounts, subscriptions, payments } from "@shared/schema";
+import { accounts, subscriptions, payments, refunds } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth } from "./auth";
+import { requireAuth, requireAdmin } from "./auth";
 import { randomUUID } from "crypto";
 
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID || "";
@@ -129,8 +129,36 @@ export function registerPaymentRoutes(app: Express) {
         return res.status(400).json({ message: "Неверный формат webhook" });
       }
 
-      const yookassaPaymentId: string = event.object.id;
       const eventType: string = event.event;
+
+      if (eventType === "refund.succeeded") {
+        const yookassaRefundId: string = event.object.id;
+        const yookassaPaymentId: string = event.object.payment_id;
+        const refundAmount: string = event.object.amount?.value || "0";
+
+        await db.update(refunds)
+          .set({ status: "succeeded", updatedAt: new Date() })
+          .where(eq(refunds.yookassaRefundId, yookassaRefundId));
+
+        const [payment] = await db.select().from(payments)
+          .where(eq(payments.yookassaPaymentId, yookassaPaymentId));
+
+        if (payment) {
+          await db.update(payments)
+            .set({ status: "refunded", updatedAt: new Date() })
+            .where(eq(payments.yookassaPaymentId, yookassaPaymentId));
+
+          await db.update(subscriptions)
+            .set({ isPaid: false })
+            .where(eq(subscriptions.id, payment.subscriptionId));
+
+          console.log(`[payments] Refund ${yookassaRefundId} succeeded for subscription ${payment.subscriptionId}, amount: ${refundAmount} RUB`);
+        }
+
+        return res.status(200).json({ ok: true });
+      }
+
+      const yookassaPaymentId: string = event.object.id;
       const newStatus: string = event.object.status;
 
       const [payment] = await db.select().from(payments)
@@ -226,6 +254,79 @@ export function registerPaymentRoutes(app: Express) {
       return res.json(userPayments);
     } catch {
       return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/admin/subscriptions/:id/refund", requireAuth, requireAdmin, async (req, res) => {
+    if (!isConfigured()) {
+      return res.status(503).json({ message: "Платёжная система не настроена" });
+    }
+
+    const subscriptionId = parseInt(req.params.id);
+    if (isNaN(subscriptionId)) {
+      return res.status(400).json({ message: "Неверный ID абонемента" });
+    }
+
+    try {
+      const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId));
+      if (!sub) return res.status(404).json({ message: "Абонемент не найден" });
+      if (!sub.isPaid) return res.status(400).json({ message: "Абонемент не оплачен — возврат невозможен" });
+
+      const [payment] = await db.select().from(payments)
+        .where(eq(payments.subscriptionId, subscriptionId))
+        .orderBy(desc(payments.createdAt))
+        .limit(1);
+
+      if (!payment || payment.status !== "succeeded") {
+        return res.status(400).json({ message: "Нет успешного платежа для этого абонемента" });
+      }
+
+      const existingRefund = await db.select().from(refunds)
+        .where(eq(refunds.paymentId, payment.id))
+        .limit(1);
+
+      if (existingRefund.length > 0) {
+        return res.status(400).json({ message: "Возврат по этому платежу уже был инициирован" });
+      }
+
+      const idempotenceKey = randomUUID();
+      const refundData = await yookassaRequest("POST", "/refunds", {
+        payment_id: payment.yookassaPaymentId,
+        amount: { value: payment.amount, currency: payment.currency },
+        description: `Возврат средств за абонемент #${subscriptionId}`,
+      }, idempotenceKey);
+
+      const [newRefund] = await db.insert(refunds).values({
+        paymentId: payment.id,
+        subscriptionId,
+        yookassaRefundId: refundData.id,
+        amount: payment.amount,
+        currency: payment.currency,
+        status: refundData.status,
+      }).returning();
+
+      if (refundData.status === "succeeded") {
+        await db.update(payments)
+          .set({ status: "refunded", updatedAt: new Date() })
+          .where(eq(payments.id, payment.id));
+
+        await db.update(subscriptions)
+          .set({ isPaid: false })
+          .where(eq(subscriptions.id, subscriptionId));
+
+        console.log(`[payments] Instant refund ${refundData.id} succeeded for subscription ${subscriptionId}`);
+      } else {
+        console.log(`[payments] Refund ${refundData.id} initiated for subscription ${subscriptionId}, status: ${refundData.status}`);
+      }
+
+      return res.json({
+        refundId: refundData.id,
+        status: refundData.status,
+        amount: payment.amount,
+      });
+    } catch (e: any) {
+      console.error("[payments] Refund error:", e?.message || e);
+      return res.status(500).json({ message: "Ошибка при создании возврата. " + (e?.message || "") });
     }
   });
 }
