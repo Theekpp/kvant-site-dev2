@@ -748,7 +748,6 @@ export default function HomeBlueAccent() {
               <div>© {new Date().getFullYear()} Kvant. Все права защищены.</div>
               <div className="flex gap-4">
                 <a href="#" className="hover:text-white transition-colors">Telegram</a>
-                <a href="#" className="hover:text-white transition-colors">WhatsApp</a>
                 <a href="#" className="hover:text-white transition-colors">ВКонтакте</a>
               </div>
             </div>
