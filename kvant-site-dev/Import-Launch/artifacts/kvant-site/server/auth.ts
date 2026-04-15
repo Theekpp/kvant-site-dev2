@@ -188,8 +188,8 @@ export function registerAuthRoutes(app: Express) {
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        sameSite: "strict",
-        secure: process.env.NODE_ENV === "production",
+        sameSite: "none",
+        secure: true,
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
 
@@ -257,7 +257,7 @@ export function registerAuthRoutes(app: Express) {
         }
       } catch { /* ignore */ }
     }
-    res.clearCookie("refreshToken");
+    res.clearCookie("refreshToken", { httpOnly: true, sameSite: "none", secure: true });
     return res.json({ message: "Выход выполнен" });
   });
 

@@ -761,6 +761,8 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
 
   const isFeatured = plan.featured;
 
+  const isLifted = hovered || showModal;
+
   return (
     <div
       ref={cardRef}
@@ -769,7 +771,10 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
           ? "bg-gradient-to-br from-indigo-600 to-blue-700 shadow-2xl"
           : `${"cardBg" in plan && plan.cardBg ? plan.cardBg : "bg-white"} shadow-lg`
       }`}
-      style={isFeatured ? { boxShadow: "0 20px 60px rgba(79,70,229,0.4)" } : {}}
+      style={isFeatured
+        ? { boxShadow: "0 20px 60px rgba(79,70,229,0.4)", transform: isLifted ? "translateY(-12px) scale(1.025)" : undefined }
+        : { transform: isLifted ? "translateY(-12px) scale(1.025)" : undefined }
+      }
       onMouseEnter={() => { if (!showModal) setHovered(true); }}
       onMouseLeave={() => { if (!showModal) setHovered(false); }}
     >
@@ -878,7 +883,6 @@ export default function PricingCards({ isLoggedIn = false }: { isLoggedIn?: bool
         @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
         .pc-icon-float { animation: float 3s ease-in-out infinite; }
         .pc-card-lift { transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.35s ease; }
-        .pc-card-lift:hover { transform: translateY(-12px) scale(1.025); }
       `}</style>
 
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">

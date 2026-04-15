@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGetBookings, useGetSubscriptions, useMarkBookingPaid, useMarkSubscriptionPaid, useRefundSubscription } from "@/lib/admin-api";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -141,57 +141,53 @@ export default function Payments() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 bg-green-500/10 rounded-xl flex items-center justify-center">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{paidBookings}</div>
-                <div className="text-xs text-muted-foreground">Записей оплачено</div>
-              </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Записей оплачено</CardTitle>
+            <div className="h-10 w-10 bg-green-500/10 rounded-xl flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{paidBookings}</div>
+            <p className="text-xs text-muted-foreground mt-1">Из {(bookings || []).length} всего</p>
           </CardContent>
         </Card>
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 bg-amber-500/10 rounded-xl flex items-center justify-center">
-                <XCircle className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{unpaidBookings}</div>
-                <div className="text-xs text-muted-foreground">Записей не оплачено</div>
-              </div>
+        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Записей не оплачено</CardTitle>
+            <div className="h-10 w-10 bg-amber-500/10 rounded-xl flex items-center justify-center">
+              <XCircle className="h-5 w-5 text-amber-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{unpaidBookings}</div>
+            <p className="text-xs text-muted-foreground mt-1">Ожидают оплаты</p>
           </CardContent>
         </Card>
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 bg-blue-500/10 rounded-xl flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{paidSubs}</div>
-                <div className="text-xs text-muted-foreground">Абонем. активных</div>
-              </div>
+        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Абонементов активных</CardTitle>
+            <div className="h-10 w-10 bg-blue-500/10 rounded-xl flex items-center justify-center">
+              <CreditCard className="h-5 w-5 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{paidSubs}</div>
+            <p className="text-xs text-muted-foreground mt-1">Из {(subscriptions || []).length} всего</p>
           </CardContent>
         </Card>
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 bg-red-500/10 rounded-xl flex items-center justify-center">
-                <XCircle className="h-5 w-5 text-red-500" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{unpaidSubs}</div>
-                <div className="text-xs text-muted-foreground">Абонем. не оплачено</div>
-              </div>
+        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Абонементов не оплачено</CardTitle>
+            <div className="h-10 w-10 bg-red-500/10 rounded-xl flex items-center justify-center">
+              <XCircle className="h-5 w-5 text-red-500" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{unpaidSubs}</div>
+            <p className="text-xs text-muted-foreground mt-1">Ожидают активации</p>
           </CardContent>
         </Card>
       </div>
