@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { getMe } from "@/lib/auth";
+import { getAccessToken, getMe, tryRefreshToken } from "@/lib/auth";
 
 interface Props {
   children: ReactNode;
@@ -11,12 +11,24 @@ export default function ProtectedRoute({ children }: Props) {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    getMe()
-      .then(() => setStatus("authed"))
-      .catch(() => {
+    const check = async () => {
+      if (!getAccessToken()) {
+        const ok = await tryRefreshToken();
+        if (!ok) {
+          setStatus("unauthed");
+          navigate("/login");
+          return;
+        }
+      }
+      try {
+        await getMe();
+        setStatus("authed");
+      } catch {
         setStatus("unauthed");
         navigate("/login");
-      });
+      }
+    };
+    check();
   }, []);
 
   if (status === "loading") {

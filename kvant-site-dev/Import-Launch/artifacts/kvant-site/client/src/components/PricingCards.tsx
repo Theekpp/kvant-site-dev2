@@ -770,8 +770,8 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
           : `${"cardBg" in plan && plan.cardBg ? plan.cardBg : "bg-white"} shadow-lg`
       }`}
       style={isFeatured ? { boxShadow: "0 20px 60px rgba(79,70,229,0.4)" } : {}}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => { if (!showModal) setHovered(true); }}
+      onMouseLeave={() => { if (!showModal) setHovered(false); }}
     >
       {animParams && (
         <CardAnim
@@ -866,7 +866,7 @@ function PricingCard({ plan, isLoggedIn }: { plan: typeof plans[0]; isLoggedIn: 
         {added ? "✓ Добавлено!" : adding ? "Добавляем..." : plan.buttonText}
       </button>
 
-      {showModal && <AuthModal plan={plan} onClose={() => setShowModal(false)} />}
+      {showModal && <AuthModal plan={plan} onClose={() => { setShowModal(false); setHovered(false); }} />}
     </div>
   );
 }

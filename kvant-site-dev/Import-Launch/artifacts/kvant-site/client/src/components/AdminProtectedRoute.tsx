@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { getMe } from "@/lib/auth";
+import { getAccessToken, getMe, tryRefreshToken } from "@/lib/auth";
 
 interface Props {
   children: ReactNode;
@@ -11,19 +11,29 @@ export default function AdminProtectedRoute({ children }: Props) {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    getMe()
-      .then((data) => {
+    const check = async () => {
+      if (!getAccessToken()) {
+        const ok = await tryRefreshToken();
+        if (!ok) {
+          setStatus("unauthed");
+          navigate("/login");
+          return;
+        }
+      }
+      try {
+        const data = await getMe();
         const role = data?.account?.role;
         if (role === "admin") {
           setStatus("authed");
         } else {
           setStatus("forbidden");
         }
-      })
-      .catch(() => {
+      } catch {
         setStatus("unauthed");
         navigate("/login");
-      });
+      }
+    };
+    check();
   }, []);
 
   if (status === "loading") {
