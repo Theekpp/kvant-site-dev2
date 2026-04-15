@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "./db";
 import { accounts, subscriptions, payments } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { randomUUID } from "crypto";
 
@@ -186,7 +186,9 @@ export function registerPaymentRoutes(app: Express) {
       }
 
       const [payment] = await db.select().from(payments)
-        .where(eq(payments.subscriptionId, subscriptionId));
+        .where(eq(payments.subscriptionId, subscriptionId))
+        .orderBy(desc(payments.createdAt))
+        .limit(1);
 
       if (!payment) {
         return res.json({ isPaid: false });

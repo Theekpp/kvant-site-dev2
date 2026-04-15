@@ -127,6 +127,7 @@ export default function Cabinet() {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState<number | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [checkStatusLoading, setCheckStatusLoading] = useState<number | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -184,6 +185,26 @@ export default function Cabinet() {
     } catch (err: any) {
       alert(err.response?.data?.message || "Ошибка при создании платежа");
       setPaymentLoading(null);
+    }
+  };
+
+  const handleCheckPaymentStatus = async (subId: number) => {
+    setCheckStatusLoading(subId);
+    try {
+      const r = await api.post(`/api/cabinet/check-payment/${subId}`, {});
+      if (r.data.isPaid) {
+        setSubscriptions(prev =>
+          prev.map(s => s.id === subId ? { ...s, isPaid: true } : s)
+        );
+        setPaymentSuccess(true);
+        setTimeout(() => setPaymentSuccess(false), 5000);
+      } else {
+        alert("Платёж ещё не подтверждён. Попробуйте через несколько секунд.");
+      }
+    } catch {
+      alert("Не удалось проверить статус платежа. Попробуйте позже.");
+    } finally {
+      setCheckStatusLoading(null);
     }
   };
 
@@ -512,28 +533,52 @@ export default function Cabinet() {
                         </div>
                       </div>
                       {!sub.isPaid && (
-                        <button
-                          onClick={() => handlePaySubscription(sub.id)}
-                          disabled={paymentLoading === sub.id}
-                          className="mt-4 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {paymentLoading === sub.id ? (
-                            <>
-                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                              </svg>
-                              Переход к оплате...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                              </svg>
-                              Оплатить через ЮКассу
-                            </>
-                          )}
-                        </button>
+                        <div className="mt-4 flex flex-col gap-2">
+                          <button
+                            onClick={() => handlePaySubscription(sub.id)}
+                            disabled={paymentLoading === sub.id || checkStatusLoading === sub.id}
+                            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {paymentLoading === sub.id ? (
+                              <>
+                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Переход к оплате...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                </svg>
+                                Оплатить через ЮКассу
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleCheckPaymentStatus(sub.id)}
+                            disabled={checkStatusLoading === sub.id || paymentLoading === sub.id}
+                            className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-indigo-600 border border-slate-200 hover:border-indigo-300 text-xs font-medium py-2 px-4 rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {checkStatusLoading === sub.id ? (
+                              <>
+                                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Проверяем...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Уже оплатил — обновить статус
+                              </>
+                            )}
+                          </button>
+                        </div>
                       )}
                     </div>
                   );
