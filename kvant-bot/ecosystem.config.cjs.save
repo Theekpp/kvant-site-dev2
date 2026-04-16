@@ -1,0 +1,14 @@
+module.exports = {
+  apps: [{
+    name: 'kvant-bot',
+    script: 'dist/index.cjs',
+    env: {
+      NODE_ENV: 'production',
+      TELEGRAM_BOT_TOKEN: '8387870805:AAH0a97WcNZMqF4PibVn26xUJca-ZLGx33I',
+      ADMIN_CHAT_ID: '730318118',
+      DATABASE_URL: 'postgresql://booking_user:superkvantum123@localhost:5432/booking_db',
+      PORT: '5001',
+      
+    }
+  }]
+}
