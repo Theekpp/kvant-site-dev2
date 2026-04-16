@@ -516,22 +516,22 @@ export default function HomeBlueAccent() {
               </div>
 
               {/* Quick Stats */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm">
-                  <div className="text-3xl font-bold text-[#4F46E5] mb-1">200+</div>
-                  <div className="text-sm text-slate-600">Учеников</div>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="bg-slate-50 rounded-2xl p-3 sm:p-6 border border-slate-200 text-center hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm">
+                  <div className="text-2xl sm:text-3xl font-bold text-[#4F46E5] mb-1">200+</div>
+                  <div className="text-xs sm:text-sm text-slate-600">Учеников</div>
                 </div>
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-purple-50 hover:border-purple-200 transition-colors shadow-sm">
-                  <div className="text-2xl font-bold text-[#4F46E5] mb-1">7–11</div>
-                  <div className="text-sm text-slate-600">Классы</div>
+                <div className="bg-slate-50 rounded-2xl p-3 sm:p-6 border border-slate-200 text-center hover:bg-purple-50 hover:border-purple-200 transition-colors shadow-sm">
+                  <div className="text-xl sm:text-2xl font-bold text-[#4F46E5] mb-1">7–11</div>
+                  <div className="text-xs sm:text-sm text-slate-600">Классы</div>
                 </div>
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-cyan-50 hover:border-cyan-200 transition-colors shadow-sm">
-                  <div className="text-xl font-bold text-[#4F46E5] mb-1 leading-tight">ОГЭ / Олимпиады</div>
-                  <div className="text-sm text-slate-600">Подготовка</div>
+                <div className="bg-slate-50 rounded-2xl p-3 sm:p-6 border border-slate-200 text-center hover:bg-cyan-50 hover:border-cyan-200 transition-colors shadow-sm">
+                  <div className="text-sm sm:text-xl font-bold text-[#4F46E5] mb-1 leading-tight">ОГЭ / Олимпиады</div>
+                  <div className="text-xs sm:text-sm text-slate-600">Подготовка</div>
                 </div>
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-sm">
-                  <div className="font-bold text-[#4F46E5] mb-1 text-[20px]">Индивидуальный подход</div>
-                  <div className="text-sm text-slate-600">К каждому</div>
+                <div className="bg-slate-50 rounded-2xl p-3 sm:p-6 border border-slate-200 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-sm">
+                  <div className="text-xs sm:text-base lg:text-[20px] font-bold text-[#4F46E5] mb-1 leading-snug">Индивидуальный подход</div>
+                  <div className="text-xs sm:text-sm text-slate-600">К каждому</div>
                 </div>
               </div>
             </div>
