@@ -206,12 +206,12 @@ export default function HomeBlueAccent() {
               Индивидуальный подход к каждому ученику, современные методики обучения и гарантированный результат.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <a href={BOT_URL} target="_blank" rel="noopener noreferrer">
-                <Button size="lg" className="bg-gradient-to-r from-[#4F46E5] to-[#2563EB] text-white rounded-[20px] px-8 h-12 text-base shadow-md hover:shadow-lg hover:opacity-95 transition-all active:scale-95 border-0 font-semibold">
+              <a href={BOT_URL} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-[#4F46E5] to-[#2563EB] text-white rounded-[20px] px-8 h-12 text-base shadow-md hover:shadow-lg hover:opacity-95 transition-all active:scale-95 border-0 font-semibold">
                   Записаться на занятие
                 </Button>
               </a>
-              <Button variant="outline" size="lg" className="rounded-[20px] px-8 h-12 text-base border-2 border-[#4F46E5] text-[#4F46E5] hover:bg-blue-50 bg-transparent transition-colors font-medium" onClick={() => scrollToSection('demo')}>
+              <Button variant="outline" size="lg" className="w-full sm:w-auto rounded-[20px] px-8 h-12 text-base border-2 border-[#4F46E5] text-[#4F46E5] hover:bg-blue-50 bg-transparent transition-colors font-medium" onClick={() => scrollToSection('demo')}>
                 Увидеть физику в действии
               </Button>
             </div>
