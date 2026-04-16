@@ -37,13 +37,13 @@ waitForPort = 5000
 name = "Telegram Bot"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd kvant-bot && pnpm install --no-frozen-lockfile && PORT=8099 NODE_ENV=development tsx server/index.ts"
-waitForPort = 8099
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd kvant-bot && pnpm install --no-frozen-lockfile && PORT=8099 NODE_ENV=development node_modules/.bin/tsx server/index.ts"
+waitForPort = 8099
 
 [[ports]]
 localPort = 5000
