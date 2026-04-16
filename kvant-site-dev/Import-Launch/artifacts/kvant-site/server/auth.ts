@@ -459,6 +459,18 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Аккаунт не привязан к пользователю" });
       }
 
+      // Find an active paid subscription matching the booking type with remaining lessons
+      const [activeSub] = await db.select().from(subscriptions)
+        .where(and(
+          eq(subscriptions.userId, account.userId),
+          eq(subscriptions.type, type),
+          eq(subscriptions.isPaid, true),
+          eq(subscriptions.status, "active"),
+          gt(subscriptions.remainingLessons, 0),
+        ))
+        .limit(1);
+
+      // Create booking — mark as paid automatically if subscription available
       const [booking] = await db.insert(bookings).values({
         userId: account.userId,
         type,
@@ -466,7 +478,17 @@ export function registerAuthRoutes(app: Express) {
         time,
         groupScheduleId: groupScheduleId || null,
         status: "confirmed",
+        isPaid: !!activeSub,
+        paymentMethod: activeSub ? "subscription" : null,
       }).returning();
+
+      // Deduct one lesson from the subscription
+      if (activeSub) {
+        await db.update(subscriptions)
+          .set({ remainingLessons: activeSub.remainingLessons - 1 })
+          .where(eq(subscriptions.id, activeSub.id));
+      }
+
       return res.status(201).json(booking);
     } catch {
       return res.status(500).json({ message: "Ошибка сервера" });
