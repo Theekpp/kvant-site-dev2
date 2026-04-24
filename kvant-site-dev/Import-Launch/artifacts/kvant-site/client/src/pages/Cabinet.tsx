@@ -53,6 +53,43 @@ const CABINET_PLANS = [
 
 const DAY_NAMES = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const DAY_NAMES_FULL = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+const MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+const MONTHS_RU_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+function startOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function startOfWeekMon(d: Date) {
+  const x = startOfDay(d);
+  const dow = x.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  x.setDate(x.getDate() + diff);
+  return x;
+}
+
+function addDays(d: Date, n: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function formatDateDDMMYYYY(d: Date) {
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
+function formatWeekRange(start: Date) {
+  const end = addDays(start, 6);
+  if (start.getMonth() === end.getMonth()) {
+    return `${start.getDate()}–${end.getDate()} ${MONTHS_RU[start.getMonth()]} ${start.getFullYear()}`;
+  }
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${start.getDate()} ${MONTHS_RU_SHORT[start.getMonth()]} – ${end.getDate()} ${MONTHS_RU_SHORT[end.getMonth()]} ${start.getFullYear()}`;
+  }
+  return `${start.getDate()} ${MONTHS_RU_SHORT[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${MONTHS_RU_SHORT[end.getMonth()]} ${end.getFullYear()}`;
+}
 
 const TYPE_LABELS: Record<string, string> = {
   individual: "Индивидуальное",
@@ -132,6 +169,8 @@ export default function Cabinet() {
   const [bookingDate, setBookingDate] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [bookingType, setBookingType] = useState<"individual" | "group">("individual");
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeekMon(new Date()));
   const [paymentLoading, setPaymentLoading] = useState<number | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [checkStatusLoading, setCheckStatusLoading] = useState<number | null>(null);
@@ -330,7 +369,7 @@ export default function Cabinet() {
     if (!bookingSlot) return;
     setBookingLoading(true);
     try {
-      const date = bookingSlot.specificDate || bookingDate;
+      const date = bookingDate || bookingSlot.specificDate;
       if (!date) { alert("Укажите дату"); setBookingLoading(false); return; }
       const newBooking = await api.post("/api/cabinet/bookings", {
         type: bookingSlot.slotType,
@@ -365,6 +404,49 @@ export default function Cabinet() {
       groupedSlots[s.dayOfWeek].push(s);
     }
   });
+
+  // Subscription totals by type (active + paid + remaining lessons > 0)
+  const remainingByType: Record<"individual" | "group", number> = { individual: 0, group: 0 };
+  subscriptions.forEach(s => {
+    if (s.isPaid && s.remainingLessons > 0 && (s.type === "individual" || s.type === "group")) {
+      remainingByType[s.type] += s.remainingLessons;
+    }
+  });
+
+  // Weekly calendar derived data
+  const today = startOfDay(new Date());
+  const currentWeekStart = startOfWeekMon(today);
+  const weekDays: Date[] = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Build a quick lookup of bookings the user already has on a specific date+time+type
+  const userBookingsKey = new Set<string>();
+  bookings.forEach(b => {
+    if (b.status === "confirmed") {
+      userBookingsKey.add(`${b.type}|${b.date}|${b.time}`);
+    }
+  });
+
+  // Returns slots available for a given date filtered by booking type
+  function slotsForDate(date: Date, type: "individual" | "group"): ScheduleSlot[] {
+    const dateStr = formatDateDDMMYYYY(date);
+    const dow = date.getDay();
+    const result: ScheduleSlot[] = [];
+
+    // Specific-date slots take precedence and override recurring slots at the same time
+    const specificForDay = slots.filter(s => s.slotType === type && s.specificDate === dateStr);
+    const specificTimes = new Set(specificForDay.map(s => s.time));
+    result.push(...specificForDay);
+
+    slots.forEach(s => {
+      if (s.slotType !== type) return;
+      if (s.specificDate) return;
+      if (s.dayOfWeek !== dow) return;
+      if (specificTimes.has(s.time)) return;
+      result.push(s);
+    });
+
+    return result.sort((a, b) => a.time.localeCompare(b.time));
+  }
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "overview", label: "Обзор", icon: "⊡" },
@@ -865,32 +947,43 @@ export default function Cabinet() {
 
         {/* ── BOOK A LESSON ── */}
         {activeTab === "book" && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <h2 className="text-xl font-bold text-slate-900">Записаться на занятие</h2>
 
             {bookingSlot && (
               <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-4" onClick={() => setBookingSlot(null)}>
-                <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full mb-4 sm:mb-0" onClick={e => e.stopPropagation()}>
+                <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full mb-4 sm:mb-0 relative" onClick={e => e.stopPropagation()}>
                   <button onClick={() => setBookingSlot(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5L15 15M15 5L5 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
                   </button>
                   <h3 className="font-bold text-slate-900 text-lg mb-1">Подтверждение записи</h3>
                   <p className="text-sm text-slate-500 mb-4">
-                    {bookingSlot.title || TYPE_LABELS[bookingSlot.slotType]}{" · "}{bookingSlot.time}
-                    {bookingSlot.dayOfWeek !== null && ` · каждый ${DAY_NAMES_FULL[bookingSlot.dayOfWeek!]}`}
+                    {bookingSlot.title || TYPE_LABELS[bookingSlot.slotType]}
                   </p>
-                  {!bookingSlot.specificDate && (
-                    <div className="mb-4">
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Дата занятия</label>
-                      <input
-                        type="date"
-                        value={bookingDate}
-                        onChange={e => setBookingDate(e.target.value)}
-                        min={new Date().toISOString().split("T")[0]}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
+                  <div className="bg-slate-50 rounded-2xl p-4 mb-4 space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">Тип</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${bookingSlot.slotType === "group" ? "bg-violet-100 text-violet-700" : "bg-indigo-100 text-indigo-700"}`}>
+                        {TYPE_LABELS[bookingSlot.slotType]}
+                      </span>
                     </div>
-                  )}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">Дата</span>
+                      <span className="font-semibold text-slate-800">
+                        {bookingDate || bookingSlot.specificDate || "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">Время</span>
+                      <span className="font-semibold text-slate-800">{bookingSlot.time}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-200/60">
+                      <span className="text-slate-500">Остаток после записи</span>
+                      <span className="font-semibold text-slate-800">
+                        {Math.max(0, remainingByType[bookingSlot.slotType as "individual" | "group"] - 1)} зан.
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={handleBookSlot}
@@ -907,93 +1000,217 @@ export default function Cabinet() {
               </div>
             )}
 
-            {slots.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-dashed border-indigo-200 p-10 text-center">
-                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-7 h-7 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            {/* Subscription status banner */}
+            <div className={`rounded-2xl p-4 border ${
+              remainingByType.individual === 0 && remainingByType.group === 0
+                ? "bg-amber-50 border-amber-200"
+                : "bg-white border-slate-200"
+            }`}>
+              {remainingByType.individual === 0 && remainingByType.group === 0 ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-start gap-3 flex-1">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-amber-900 text-sm">Нет оплаченных занятий</p>
+                      <p className="text-amber-800 text-xs mt-0.5">Оформите тариф, чтобы записаться на занятие</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab("order")}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition flex-shrink-0"
+                  >
+                    Выбрать тариф
+                  </button>
                 </div>
-                <p className="text-slate-500 text-sm font-medium">Свободных слотов пока нет</p>
-                <p className="text-slate-400 text-xs mt-1">Расписание скоро появится — следите за обновлениями</p>
-                <a href="https://t.me/physictutor_bot" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition">
-                  Написать в Telegram →
-                </a>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {specificSlots.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3">Конкретные даты</h3>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      {specificSlots.map(slot => (
-                        <button
-                          key={slot.id}
-                          onClick={() => setBookingSlot(slot)}
-                          className="bg-white rounded-2xl border border-slate-200 p-4 text-left hover:border-indigo-400 hover:shadow-md transition-all group"
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${slot.slotType === "group" ? "bg-violet-100 group-hover:bg-violet-600" : "bg-indigo-100 group-hover:bg-indigo-600"} transition-colors`}>
-                              <svg className={`w-4 h-4 ${slot.slotType === "group" ? "text-violet-600" : "text-indigo-600"} group-hover:text-white transition-colors`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <p className="font-semibold text-slate-800 text-sm">{slot.title || TYPE_LABELS[slot.slotType]}</p>
-                              <p className="text-xs text-slate-400">{slot.specificDate} · {slot.time}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${slot.slotType === "group" ? "bg-violet-100 text-violet-700" : "bg-indigo-100 text-indigo-700"}`}>
-                              {TYPE_LABELS[slot.slotType]}
-                            </span>
-                            <span className="text-xs text-slate-400">до {slot.maxStudents} уч.</span>
-                          </div>
-                        </button>
-                      ))}
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className={`flex-1 rounded-xl p-3 flex items-center gap-3 ${
+                    remainingByType.individual > 0 ? "bg-indigo-50" : "bg-slate-50"
+                  }`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      remainingByType.individual > 0 ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
+                    }`}>
+                      <span className="text-sm font-bold">{remainingByType.individual}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Индивидуальные</p>
+                      <p className="text-sm text-slate-800 font-medium">
+                        {remainingByType.individual > 0 ? `${remainingByType.individual} занятий` : "Не оплачено"}
+                      </p>
                     </div>
                   </div>
-                )}
+                  <div className={`flex-1 rounded-xl p-3 flex items-center gap-3 ${
+                    remainingByType.group > 0 ? "bg-violet-50" : "bg-slate-50"
+                  }`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      remainingByType.group > 0 ? "bg-violet-600 text-white" : "bg-slate-200 text-slate-500"
+                    }`}>
+                      <span className="text-sm font-bold">{remainingByType.group}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Групповые</p>
+                      <p className="text-sm text-slate-800 font-medium">
+                        {remainingByType.group > 0 ? `${remainingByType.group} занятий` : "Не оплачено"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-                {Object.keys(groupedSlots).length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3">Еженедельное расписание</h3>
-                    <div className="space-y-3">
-                      {[1,2,3,4,5,6,0].filter(d => groupedSlots[d]).map(day => (
-                        <div key={day}>
-                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{DAY_NAMES_FULL[day]}</p>
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            {groupedSlots[day].map(slot => (
-                              <button
-                                key={slot.id}
-                                onClick={() => { setBookingSlot(slot); setBookingDate(""); }}
-                                className="bg-white rounded-2xl border border-slate-200 p-4 text-left hover:border-indigo-400 hover:shadow-md transition-all group"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${slot.slotType === "group" ? "bg-violet-100 group-hover:bg-violet-600" : "bg-indigo-100 group-hover:bg-indigo-600"} transition-colors`}>
-                                    <span className={`text-sm font-bold ${slot.slotType === "group" ? "text-violet-600" : "text-indigo-600"} group-hover:text-white transition-colors`}>{slot.time}</span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="font-semibold text-slate-800 text-sm">{slot.title || TYPE_LABELS[slot.slotType]}</p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${slot.slotType === "group" ? "bg-violet-100 text-violet-700" : "bg-indigo-100 text-indigo-700"}`}>
-                                        {TYPE_LABELS[slot.slotType]}
-                                      </span>
-                                      <span className="text-xs text-slate-400">до {slot.maxStudents} уч.</span>
-                                    </div>
-                                  </div>
-                                  <svg className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                  </svg>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+            {/* Type filter */}
+            <div className="flex gap-1 bg-white rounded-2xl border border-slate-200 p-1.5 shadow-sm">
+              {(["individual", "group"] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setBookingType(t)}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    bookingType === t
+                      ? t === "group"
+                        ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md"
+                        : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md"
+                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                  }`}
+                >
+                  {TYPE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+
+            {/* Week navigator */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-3 flex items-center gap-2 shadow-sm">
+              <button
+                onClick={() => setWeekStart(prev => addDays(prev, -7))}
+                disabled={weekStart.getTime() <= currentWeekStart.getTime()}
+                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+                aria-label="Предыдущая неделя"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div className="flex-1 text-center">
+                <p className="font-semibold text-slate-800 text-sm sm:text-base">{formatWeekRange(weekStart)}</p>
+                {weekStart.getTime() !== currentWeekStart.getTime() && (
+                  <button
+                    onClick={() => setWeekStart(currentWeekStart)}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-0.5"
+                  >
+                    К текущей неделе
+                  </button>
                 )}
+              </div>
+              <button
+                onClick={() => setWeekStart(prev => addDays(prev, 7))}
+                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition flex-shrink-0"
+                aria-label="Следующая неделя"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Weekly calendar grid */}
+            <div className="space-y-3">
+              {weekDays.map((date, idx) => {
+                const isPast = date.getTime() < today.getTime();
+                const isToday = date.getTime() === today.getTime();
+                const dateStr = formatDateDDMMYYYY(date);
+                const daySlots = slotsForDate(date, bookingType);
+                const hasActiveSub = remainingByType[bookingType] > 0;
+                const dow = date.getDay();
+                const accent = bookingType === "group" ? "violet" : "indigo";
+
+                return (
+                  <div
+                    key={idx}
+                    className={`bg-white rounded-2xl border p-4 transition-all ${
+                      isPast ? "border-slate-100 opacity-60" : isToday ? "border-indigo-200 shadow-sm" : "border-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${
+                          isPast ? "bg-slate-100 text-slate-400"
+                            : isToday ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white"
+                            : "bg-slate-50 text-slate-700"
+                        }`}>
+                          <span className="text-xs font-medium leading-none opacity-80">{DAY_NAMES[dow]}</span>
+                          <span className="text-base font-bold leading-none mt-0.5">{date.getDate()}</span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-800 text-sm">{DAY_NAMES_FULL[dow]}</p>
+                          <p className="text-xs text-slate-400">{date.getDate()} {MONTHS_RU[date.getMonth()]}</p>
+                        </div>
+                      </div>
+                      {isPast && (
+                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Прошедшая дата</span>
+                      )}
+                      {isToday && !isPast && (
+                        <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full font-medium">Сегодня</span>
+                      )}
+                    </div>
+
+                    {daySlots.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic pl-14">Свободных слотов нет</p>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pl-0 sm:pl-14">
+                        {daySlots.map(slot => {
+                          const alreadyBooked = userBookingsKey.has(`${slot.slotType}|${dateStr}|${slot.time}`);
+                          const blocked = isPast || !hasActiveSub || alreadyBooked;
+                          const blockedReason = isPast
+                            ? "Дата уже прошла"
+                            : alreadyBooked
+                              ? "Вы уже записаны на это время"
+                              : !hasActiveSub
+                                ? `Нужен абонемент на ${bookingType === "group" ? "групповые" : "индивидуальные"} занятия`
+                                : "";
+
+                          return (
+                            <button
+                              key={slot.id}
+                              onClick={() => {
+                                if (blocked) return;
+                                setBookingSlot(slot);
+                                setBookingDate(dateStr);
+                              }}
+                              disabled={blocked}
+                              title={blockedReason || `Записаться на ${slot.time}`}
+                              className={`relative rounded-xl px-3 py-2.5 text-sm font-semibold transition-all border ${
+                                blocked
+                                  ? "bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed"
+                                  : accent === "violet"
+                                    ? "bg-violet-50 border-violet-100 text-violet-700 hover:bg-violet-600 hover:text-white hover:border-violet-600 hover:shadow-md"
+                                    : "bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:shadow-md"
+                              }`}
+                            >
+                              <span className="block">{slot.time}</span>
+                              {alreadyBooked && (
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {slots.length === 0 && (
+              <div className="bg-white rounded-2xl border border-dashed border-indigo-200 p-8 text-center">
+                <p className="text-slate-500 text-sm font-medium">Расписание пока не опубликовано</p>
+                <p className="text-slate-400 text-xs mt-1">Скоро здесь появятся свободные слоты</p>
               </div>
             )}
           </div>

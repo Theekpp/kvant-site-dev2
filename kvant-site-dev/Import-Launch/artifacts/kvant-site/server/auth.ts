@@ -453,6 +453,26 @@ export function registerAuthRoutes(app: Express) {
   app.post("/api/cabinet/bookings", requireAuth, async (req, res) => {
     const { type, date, time, groupScheduleId } = req.body;
     try {
+      if (!type || !date || !time) {
+        return res.status(400).json({ message: "Не хватает данных для записи" });
+      }
+      if (type !== "individual" && type !== "group") {
+        return res.status(400).json({ message: "Неверный тип занятия" });
+      }
+
+      // Reject past dates (date format: DD.MM.YYYY)
+      const dateMatch = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(date);
+      if (!dateMatch) {
+        return res.status(400).json({ message: "Неверный формат даты" });
+      }
+      const [, dd, mm, yyyy] = dateMatch;
+      const slotDate = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (slotDate < today) {
+        return res.status(400).json({ message: "Нельзя записаться на прошедшую дату" });
+      }
+
       const [account] = await db.select().from(accounts)
         .where(eq(accounts.id, req.accountId!));
       if (!account?.userId) {
@@ -470,7 +490,15 @@ export function registerAuthRoutes(app: Express) {
         ))
         .limit(1);
 
-      // Create booking — mark as paid automatically if subscription available
+      // Booking requires an active paid subscription of the matching type
+      if (!activeSub) {
+        const typeLabel = type === "individual" ? "индивидуальные" : "групповые";
+        return res.status(402).json({
+          message: `Для записи нужен оплаченный абонемент на ${typeLabel} занятия. Оформите тариф в разделе «Выбрать тариф».`,
+        });
+      }
+
+      // Create the confirmed, paid booking
       const [booking] = await db.insert(bookings).values({
         userId: account.userId,
         type,
@@ -478,16 +506,14 @@ export function registerAuthRoutes(app: Express) {
         time,
         groupScheduleId: groupScheduleId || null,
         status: "confirmed",
-        isPaid: !!activeSub,
-        paymentMethod: activeSub ? "subscription" : null,
+        isPaid: true,
+        paymentMethod: "subscription",
       }).returning();
 
       // Deduct one lesson from the subscription
-      if (activeSub) {
-        await db.update(subscriptions)
-          .set({ remainingLessons: activeSub.remainingLessons - 1 })
-          .where(eq(subscriptions.id, activeSub.id));
-      }
+      await db.update(subscriptions)
+        .set({ remainingLessons: activeSub.remainingLessons - 1 })
+        .where(eq(subscriptions.id, activeSub.id));
 
       return res.status(201).json(booking);
     } catch {
