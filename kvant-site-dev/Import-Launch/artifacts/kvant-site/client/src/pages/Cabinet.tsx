@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { logout } from "@/lib/auth";
 import api from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { BookingCalendar } from "@/components/BookingCalendar";
+import { startOfDay, startOfWeekMon } from "@/lib/date-utils";
 import kvantLogo from "@assets/image_1775753659602.png";
 
 interface Account {
@@ -50,46 +53,6 @@ const CABINET_PLANS = [
   { id: "max", title: "Пакет «Максимальный результат»", subtitle: "8 занятий", price: "10 800 ₽", priceOld: "12 000 ₽", subType: "individual", lessons: 8, featured: true, badgeCls: "bg-orange-100 text-orange-700", priceCls: "text-orange-600", borderCls: "border-orange-200", bgCls: "bg-orange-50" },
   { id: "group", title: "Групповое занятие", subtitle: "до 4 учеников", price: "1 000 ₽", subType: "group", lessons: 1, badgeCls: "bg-violet-100 text-violet-700", priceCls: "text-violet-600", borderCls: "border-violet-100", bgCls: "bg-violet-50" },
 ];
-
-const DAY_NAMES = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
-const DAY_NAMES_FULL = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
-const MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-const MONTHS_RU_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function startOfWeekMon(d: Date) {
-  const x = startOfDay(d);
-  const dow = x.getDay();
-  const diff = dow === 0 ? -6 : 1 - dow;
-  x.setDate(x.getDate() + diff);
-  return x;
-}
-
-function addDays(d: Date, n: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
-function formatDateDDMMYYYY(d: Date) {
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
-}
-
-function formatWeekRange(start: Date) {
-  const end = addDays(start, 6);
-  if (start.getMonth() === end.getMonth()) {
-    return `${start.getDate()}–${end.getDate()} ${MONTHS_RU[start.getMonth()]} ${start.getFullYear()}`;
-  }
-  if (start.getFullYear() === end.getFullYear()) {
-    return `${start.getDate()} ${MONTHS_RU_SHORT[start.getMonth()]} – ${end.getDate()} ${MONTHS_RU_SHORT[end.getMonth()]} ${start.getFullYear()}`;
-  }
-  return `${start.getDate()} ${MONTHS_RU_SHORT[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${MONTHS_RU_SHORT[end.getMonth()]} ${end.getFullYear()}`;
-}
 
 const TYPE_LABELS: Record<string, string> = {
   individual: "Индивидуальное",
@@ -153,6 +116,7 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
 
 export default function Cabinet() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [account, setAccount] = useState<Account | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -226,7 +190,7 @@ export default function Cabinet() {
       setOrderCart({});
       setActiveTab("subscriptions");
     } catch {
-      alert("Ошибка при оформлении. Попробуйте ещё раз.");
+      toast({ title: "Ошибка при оформлении", description: "Попробуйте ещё раз.", variant: "destructive" });
     } finally {
       setOrderLoading(false);
     }
@@ -239,10 +203,10 @@ export default function Cabinet() {
       if (r.data.confirmationUrl) {
         window.location.href = r.data.confirmationUrl;
       } else {
-        alert("Не удалось получить ссылку для оплаты. Попробуйте позже.");
+        toast({ title: "Не удалось получить ссылку для оплаты", description: "Попробуйте позже.", variant: "destructive" });
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || "Ошибка при создании платежа");
+      toast({ title: err.response?.data?.message || "Ошибка при создании платежа", variant: "destructive" });
     } finally {
       setPayAllLoading(false);
     }
@@ -309,10 +273,10 @@ export default function Cabinet() {
       if (r.data.confirmationUrl) {
         window.location.href = r.data.confirmationUrl;
       } else {
-        alert("Не удалось получить ссылку для оплаты. Попробуйте позже.");
+        toast({ title: "Не удалось получить ссылку для оплаты", description: "Попробуйте позже.", variant: "destructive" });
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || "Ошибка при создании платежа");
+      toast({ title: err.response?.data?.message || "Ошибка при создании платежа", variant: "destructive" });
       setPaymentLoading(null);
     }
   };
@@ -328,10 +292,10 @@ export default function Cabinet() {
         setPaymentSuccess(true);
         setTimeout(() => setPaymentSuccess(false), 5000);
       } else {
-        alert("Платёж ещё не подтверждён. Попробуйте через несколько секунд.");
+        toast({ title: "Платёж ещё не подтверждён", description: "Попробуйте через несколько секунд." });
       }
     } catch {
-      alert("Не удалось проверить статус платежа. Попробуйте позже.");
+      toast({ title: "Не удалось проверить статус платежа", description: "Попробуйте позже.", variant: "destructive" });
     } finally {
       setCheckStatusLoading(null);
     }
@@ -361,7 +325,7 @@ export default function Cabinet() {
       await api.delete(`/api/cabinet/bookings/${id}`);
       setBookings(prev => prev.map(b => b.id === id ? { ...b, status: "cancelled" } : b));
     } catch (err: any) {
-      alert(err.response?.data?.message || "Ошибка отмены");
+      toast({ title: err.response?.data?.message || "Ошибка отмены", variant: "destructive" });
     }
   };
 
@@ -370,7 +334,11 @@ export default function Cabinet() {
     setBookingLoading(true);
     try {
       const date = bookingDate || bookingSlot.specificDate;
-      if (!date) { alert("Укажите дату"); setBookingLoading(false); return; }
+      if (!date) {
+        toast({ title: "Укажите дату", variant: "destructive" });
+        setBookingLoading(false);
+        return;
+      }
       const newBooking = await api.post("/api/cabinet/bookings", {
         type: bookingSlot.slotType,
         date,
@@ -383,7 +351,7 @@ export default function Cabinet() {
       setBookingDate("");
       setTimeout(() => setBookingSuccess(false), 3000);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Не удалось записаться");
+      toast({ title: err.response?.data?.message || "Не удалось записаться", variant: "destructive" });
     } finally {
       setBookingLoading(false);
     }
@@ -413,40 +381,9 @@ export default function Cabinet() {
     }
   });
 
-  // Weekly calendar derived data
-  const today = startOfDay(new Date());
-  const currentWeekStart = startOfWeekMon(today);
-  const weekDays: Date[] = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
-  // Build a quick lookup of bookings the user already has on a specific date+time+type
-  const userBookingsKey = new Set<string>();
-  bookings.forEach(b => {
-    if (b.status === "confirmed") {
-      userBookingsKey.add(`${b.type}|${b.date}|${b.time}`);
-    }
-  });
-
-  // Returns slots available for a given date filtered by booking type
-  function slotsForDate(date: Date, type: "individual" | "group"): ScheduleSlot[] {
-    const dateStr = formatDateDDMMYYYY(date);
-    const dow = date.getDay();
-    const result: ScheduleSlot[] = [];
-
-    // Specific-date slots take precedence and override recurring slots at the same time
-    const specificForDay = slots.filter(s => s.slotType === type && s.specificDate === dateStr);
-    const specificTimes = new Set(specificForDay.map(s => s.time));
-    result.push(...specificForDay);
-
-    slots.forEach(s => {
-      if (s.slotType !== type) return;
-      if (s.specificDate) return;
-      if (s.dayOfWeek !== dow) return;
-      if (specificTimes.has(s.time)) return;
-      result.push(s);
-    });
-
-    return result.sort((a, b) => a.time.localeCompare(b.time));
-  }
+  // Weekly calendar derived data (memoized)
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const currentWeekStart = useMemo(() => startOfWeekMon(today), [today]);
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "overview", label: "Обзор", icon: "⊡" },
@@ -1081,223 +1018,21 @@ export default function Cabinet() {
               ))}
             </div>
 
-            {/* Week navigator */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-3 flex items-center gap-2 shadow-sm">
-              <button
-                onClick={() => setWeekStart(prev => addDays(prev, -7))}
-                disabled={weekStart.getTime() <= currentWeekStart.getTime()}
-                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
-                aria-label="Предыдущая неделя"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div className="flex-1 text-center">
-                <p className="font-semibold text-slate-800 text-sm sm:text-base">{formatWeekRange(weekStart)}</p>
-                {weekStart.getTime() !== currentWeekStart.getTime() && (
-                  <button
-                    onClick={() => setWeekStart(currentWeekStart)}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-0.5"
-                  >
-                    К текущей неделе
-                  </button>
-                )}
-              </div>
-              <button
-                onClick={() => setWeekStart(prev => addDays(prev, 7))}
-                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition flex-shrink-0"
-                aria-label="Следующая неделя"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Week grid (Google-Calendar style) */}
-            {(() => {
-              const HOUR_HEIGHT = 56;
-              const hasActiveSub = remainingByType[bookingType] > 0;
-              const accent = bookingType === "group" ? "violet" : "indigo";
-
-              // Collect all slots across the week for the current type, bucket by [dayIdx][hour]
-              const slotsByCell: Record<string, ScheduleSlot[]> = {};
-              const hoursWithSlots = new Set<number>();
-              weekDays.forEach((date, dayIdx) => {
-                slotsForDate(date, bookingType).forEach(slot => {
-                  const h = parseInt(slot.time.split(":")[0]);
-                  if (Number.isNaN(h)) return;
-                  hoursWithSlots.add(h);
-                  const key = `${dayIdx}-${h}`;
-                  if (!slotsByCell[key]) slotsByCell[key] = [];
-                  slotsByCell[key].push(slot);
-                });
-              });
-
-              const hoursArr = Array.from(hoursWithSlots);
-              const minHour = hoursArr.length > 0 ? Math.min(...hoursArr, 9) : 9;
-              const maxHour = hoursArr.length > 0 ? Math.max(...hoursArr, 21) + 1 : 22;
-              const startHour = Math.max(0, minHour);
-              const endHour = Math.min(24, maxHour);
-              const hours: number[] = [];
-              for (let h = startHour; h < endHour; h++) hours.push(h);
-              const tzOffsetMin = -new Date().getTimezoneOffset();
-              const tzSign = tzOffsetMin >= 0 ? "+" : "−";
-              const tzAbs = Math.abs(Math.round(tzOffsetMin / 60));
-              const tzLabel = `GMT${tzSign}${String(tzAbs).padStart(2, "0")}`;
-              const totalSlotsThisWeek = Object.values(slotsByCell).reduce((a, arr) => a + arr.length, 0);
-
-              return (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  {/* Header row */}
-                  <div
-                    className="grid border-b border-slate-200 bg-slate-50/60"
-                    style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}
-                  >
-                    <div className="py-3 px-1 text-[10px] text-slate-400 font-medium flex items-end justify-end pr-2">
-                      {tzLabel}
-                    </div>
-                    {weekDays.map((date, idx) => {
-                      const isToday = date.getTime() === today.getTime();
-                      const isPast = date.getTime() < today.getTime();
-                      const dow = date.getDay();
-                      return (
-                        <div
-                          key={idx}
-                          className={`py-2 text-center border-l border-slate-100 ${isPast ? "bg-slate-50/40" : ""}`}
-                        >
-                          <div
-                            className={`text-[10px] uppercase tracking-wider font-semibold ${
-                              isPast ? "text-slate-300" : isToday ? "text-indigo-600" : "text-slate-400"
-                            }`}
-                          >
-                            {DAY_NAMES[dow]}
-                          </div>
-                          <div className="mt-1 h-8 flex items-center justify-center">
-                            {isToday ? (
-                              <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-base font-semibold ${accent === "violet" ? "bg-violet-600" : "bg-indigo-600"}`}>
-                                {date.getDate()}
-                              </div>
-                            ) : (
-                              <span className={`text-xl font-light ${isPast ? "text-slate-300" : "text-slate-700"}`}>
-                                {date.getDate()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Time grid body */}
-                  <div className="overflow-x-auto">
-                    <div
-                      className="grid relative"
-                      style={{
-                        gridTemplateColumns: "56px repeat(7, minmax(80px, 1fr))",
-                        gridTemplateRows: `repeat(${hours.length}, ${HOUR_HEIGHT}px)`,
-                      }}
-                    >
-                      {/* Time labels */}
-                      {hours.map((h, i) => (
-                        <div
-                          key={`time-${h}`}
-                          className="text-[10px] text-slate-400 pr-2 text-right -mt-1.5"
-                          style={{ gridColumn: 1, gridRow: i + 1 }}
-                        >
-                          {String(h).padStart(2, "0")}:00
-                        </div>
-                      ))}
-
-                      {/* Day cells (background + grid lines) */}
-                      {weekDays.map((date, dayIdx) => {
-                        const isPast = date.getTime() < today.getTime();
-                        const isToday = date.getTime() === today.getTime();
-                        return hours.map((h, hIdx) => (
-                          <div
-                            key={`cell-${dayIdx}-${h}`}
-                            className={`border-l border-t border-slate-100 ${
-                              isPast ? "bg-slate-50/40" : isToday ? "bg-indigo-50/20" : ""
-                            } ${hIdx === hours.length - 1 ? "border-b border-slate-100" : ""}`}
-                            style={{ gridColumn: dayIdx + 2, gridRow: hIdx + 1 }}
-                          />
-                        ));
-                      })}
-
-                      {/* Slot blocks */}
-                      {weekDays.map((date, dayIdx) => {
-                        const isPast = date.getTime() < today.getTime();
-                        const dateStr = formatDateDDMMYYYY(date);
-                        return hours.map((h, hIdx) => {
-                          const cellKey = `${dayIdx}-${h}`;
-                          const cellSlots = slotsByCell[cellKey] || [];
-                          if (cellSlots.length === 0) return null;
-                          return (
-                            <div
-                              key={`slots-${dayIdx}-${h}`}
-                              className="p-1 flex flex-col gap-1 min-w-0"
-                              style={{ gridColumn: dayIdx + 2, gridRow: hIdx + 1 }}
-                            >
-                              {cellSlots.map(slot => {
-                                const alreadyBooked = userBookingsKey.has(`${slot.slotType}|${dateStr}|${slot.time}`);
-                                const blocked = isPast || !hasActiveSub || alreadyBooked;
-                                const blockedReason = isPast
-                                  ? "Дата уже прошла"
-                                  : alreadyBooked
-                                    ? "Вы уже записаны"
-                                    : !hasActiveSub
-                                      ? `Нужен абонемент на ${bookingType === "group" ? "групповые" : "индивидуальные"} занятия`
-                                      : "";
-                                return (
-                                  <button
-                                    key={slot.id}
-                                    onClick={() => {
-                                      if (blocked) return;
-                                      setBookingSlot(slot);
-                                      setBookingDate(dateStr);
-                                    }}
-                                    disabled={blocked}
-                                    title={blockedReason || `Записаться на ${slot.time}`}
-                                    className={`relative flex-1 min-h-0 rounded-md px-1.5 py-1 text-[11px] font-semibold leading-tight text-left border transition-all overflow-hidden ${
-                                      blocked
-                                        ? alreadyBooked
-                                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default"
-                                          : "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-                                        : accent === "violet"
-                                          ? "bg-violet-100 border-violet-200 text-violet-800 hover:bg-violet-600 hover:border-violet-600 hover:text-white hover:shadow-sm"
-                                          : "bg-indigo-100 border-indigo-200 text-indigo-800 hover:bg-indigo-600 hover:border-indigo-600 hover:text-white hover:shadow-sm"
-                                    }`}
-                                  >
-                                    <span className="block truncate">{slot.time}</span>
-                                    {alreadyBooked && (
-                                      <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full flex items-center justify-center">
-                                        <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          );
-                        });
-                      })}
-                    </div>
-                  </div>
-
-                  {totalSlotsThisWeek === 0 && (
-                    <div className="border-t border-slate-100 px-6 py-8 text-center">
-                      <p className="text-sm text-slate-500 font-medium">
-                        На этой неделе нет свободных {bookingType === "group" ? "групповых" : "индивидуальных"} занятий
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">Попробуйте переключиться на другую неделю или другой тип занятий</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <BookingCalendar
+              slots={slots}
+              bookings={bookings}
+              bookingType={bookingType}
+              hasActiveSub={remainingByType[bookingType] > 0}
+              weekStart={weekStart}
+              today={today}
+              currentWeekStart={currentWeekStart}
+              accent={bookingType === "group" ? "violet" : "indigo"}
+              onWeekChange={setWeekStart}
+              onSelectSlot={(slot, dateStr) => {
+                setBookingSlot(slot);
+                setBookingDate(dateStr);
+              }}
+            />
 
             {slots.length === 0 && (
               <div className="bg-white rounded-2xl border border-dashed border-indigo-200 p-8 text-center">

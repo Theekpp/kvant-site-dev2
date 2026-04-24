@@ -50,6 +50,20 @@ Set via SQL: `UPDATE accounts SET role='admin' WHERE email='your@email.com';`
 
 Placeholders `[ФИО]` and `[ИНН]` in legal docs must be replaced with real data before going to production.
 
+## Booking Calendar Architecture
+
+Shared booking calendar logic was extracted to reduce duplication and improve maintainability:
+
+- `client/src/lib/date-utils.ts` — `date-fns`-based wrappers (`startOfDay`, `startOfWeekMon`, `addDays`, `formatDateDDMMYYYY`, `formatWeekRange`, `getDayOfWeekMon`, `parseTimeHHMM`, `getBrowserTimezoneLabel`) and shared constants (`DAY_NAMES_SHORT/FULL`, `MONTHS_RU/SHORT`).
+- `client/src/components/BookingCalendar.tsx` — week-view calendar used by `/cabinet`. Features:
+  - `useMemo` for week days, slots-by-date, and user-bookings lookup
+  - Minute-precise slot positioning via absolute layout (not hour-rounded grid rows)
+  - Responsive view modes (1/3/7 days) via `matchMedia`
+  - Accessibility: `role="grid"`, `role="columnheader"`, `role="row"`, `role="gridcell"`, `aria-label` on every interactive element, focus-visible rings
+  - Timezone label from `Intl.DateTimeFormat().resolvedOptions().timeZone`
+- `client/src/pages/Cabinet.tsx` — uses `useToast` (no `alert()`), consumes `<BookingCalendar>`.
+- `client/src/pages/admin/Schedule.tsx` — month view; reuses shared date helpers.
+
 ## Legal / Compliance Features
 
 - **Cookie banner** — slides in from bottom on first visit; stored in `localStorage("cookies_accepted")`

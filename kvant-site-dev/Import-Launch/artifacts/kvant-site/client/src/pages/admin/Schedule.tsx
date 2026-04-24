@@ -16,19 +16,9 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, addWeeks, subWeeks, startOfWeek, endOfWeek, isSameDay, eachDayOfInterval as eachDay, parseISO, isWithinInterval } from "date-fns";
 import { ru } from "date-fns/locale";
+import { DAY_NAMES_SHORT as DAYS_SHORT, DAY_NAMES_FULL as DAYS_FULL, getDayOfWeekMon, formatDateDDMMYYYY as dateToString } from "@/lib/date-utils";
 
-const DAYS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const DAYS_FULL = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
 const TIME_PRESETS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
-
-function getDayOfWeekMon(date: Date): number {
-  const d = getDay(date);
-  return d === 0 ? 6 : d - 1;
-}
-
-function dateToString(d: Date): string {
-  return format(d, 'dd.MM.yyyy');
-}
 
 type SlotMode = "specific" | "recurring" | "period";
 
