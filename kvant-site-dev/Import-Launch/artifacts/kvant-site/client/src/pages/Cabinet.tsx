@@ -1115,97 +1115,189 @@ export default function Cabinet() {
               </button>
             </div>
 
-            {/* Weekly calendar grid */}
-            <div className="space-y-3">
-              {weekDays.map((date, idx) => {
-                const isPast = date.getTime() < today.getTime();
-                const isToday = date.getTime() === today.getTime();
-                const dateStr = formatDateDDMMYYYY(date);
-                const daySlots = slotsForDate(date, bookingType);
-                const hasActiveSub = remainingByType[bookingType] > 0;
-                const dow = date.getDay();
-                const accent = bookingType === "group" ? "violet" : "indigo";
+            {/* Week grid (Google-Calendar style) */}
+            {(() => {
+              const HOUR_HEIGHT = 56;
+              const hasActiveSub = remainingByType[bookingType] > 0;
+              const accent = bookingType === "group" ? "violet" : "indigo";
 
-                return (
+              // Collect all slots across the week for the current type, bucket by [dayIdx][hour]
+              const slotsByCell: Record<string, ScheduleSlot[]> = {};
+              const hoursWithSlots = new Set<number>();
+              weekDays.forEach((date, dayIdx) => {
+                slotsForDate(date, bookingType).forEach(slot => {
+                  const h = parseInt(slot.time.split(":")[0]);
+                  if (Number.isNaN(h)) return;
+                  hoursWithSlots.add(h);
+                  const key = `${dayIdx}-${h}`;
+                  if (!slotsByCell[key]) slotsByCell[key] = [];
+                  slotsByCell[key].push(slot);
+                });
+              });
+
+              const hoursArr = Array.from(hoursWithSlots);
+              const minHour = hoursArr.length > 0 ? Math.min(...hoursArr, 9) : 9;
+              const maxHour = hoursArr.length > 0 ? Math.max(...hoursArr, 21) + 1 : 22;
+              const startHour = Math.max(0, minHour);
+              const endHour = Math.min(24, maxHour);
+              const hours: number[] = [];
+              for (let h = startHour; h < endHour; h++) hours.push(h);
+              const tzOffsetMin = -new Date().getTimezoneOffset();
+              const tzSign = tzOffsetMin >= 0 ? "+" : "−";
+              const tzAbs = Math.abs(Math.round(tzOffsetMin / 60));
+              const tzLabel = `GMT${tzSign}${String(tzAbs).padStart(2, "0")}`;
+              const totalSlotsThisWeek = Object.values(slotsByCell).reduce((a, arr) => a + arr.length, 0);
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  {/* Header row */}
                   <div
-                    key={idx}
-                    className={`bg-white rounded-2xl border p-4 transition-all ${
-                      isPast ? "border-slate-100 opacity-60" : isToday ? "border-indigo-200 shadow-sm" : "border-slate-200"
-                    }`}
+                    className="grid border-b border-slate-200 bg-slate-50/60"
+                    style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${
-                          isPast ? "bg-slate-100 text-slate-400"
-                            : isToday ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white"
-                            : "bg-slate-50 text-slate-700"
-                        }`}>
-                          <span className="text-xs font-medium leading-none opacity-80">{DAY_NAMES[dow]}</span>
-                          <span className="text-base font-bold leading-none mt-0.5">{date.getDate()}</span>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-800 text-sm">{DAY_NAMES_FULL[dow]}</p>
-                          <p className="text-xs text-slate-400">{date.getDate()} {MONTHS_RU[date.getMonth()]}</p>
-                        </div>
-                      </div>
-                      {isPast && (
-                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Прошедшая дата</span>
-                      )}
-                      {isToday && !isPast && (
-                        <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full font-medium">Сегодня</span>
-                      )}
+                    <div className="py-3 px-1 text-[10px] text-slate-400 font-medium flex items-end justify-end pr-2">
+                      {tzLabel}
                     </div>
-
-                    {daySlots.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic pl-14">Свободных слотов нет</p>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pl-0 sm:pl-14">
-                        {daySlots.map(slot => {
-                          const alreadyBooked = userBookingsKey.has(`${slot.slotType}|${dateStr}|${slot.time}`);
-                          const blocked = isPast || !hasActiveSub || alreadyBooked;
-                          const blockedReason = isPast
-                            ? "Дата уже прошла"
-                            : alreadyBooked
-                              ? "Вы уже записаны на это время"
-                              : !hasActiveSub
-                                ? `Нужен абонемент на ${bookingType === "group" ? "групповые" : "индивидуальные"} занятия`
-                                : "";
-
-                          return (
-                            <button
-                              key={slot.id}
-                              onClick={() => {
-                                if (blocked) return;
-                                setBookingSlot(slot);
-                                setBookingDate(dateStr);
-                              }}
-                              disabled={blocked}
-                              title={blockedReason || `Записаться на ${slot.time}`}
-                              className={`relative rounded-xl px-3 py-2.5 text-sm font-semibold transition-all border ${
-                                blocked
-                                  ? "bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed"
-                                  : accent === "violet"
-                                    ? "bg-violet-50 border-violet-100 text-violet-700 hover:bg-violet-600 hover:text-white hover:border-violet-600 hover:shadow-md"
-                                    : "bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:shadow-md"
-                              }`}
-                            >
-                              <span className="block">{slot.time}</span>
-                              {alreadyBooked && (
-                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
-                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                  </svg>
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                    {weekDays.map((date, idx) => {
+                      const isToday = date.getTime() === today.getTime();
+                      const isPast = date.getTime() < today.getTime();
+                      const dow = date.getDay();
+                      return (
+                        <div
+                          key={idx}
+                          className={`py-2 text-center border-l border-slate-100 ${isPast ? "bg-slate-50/40" : ""}`}
+                        >
+                          <div
+                            className={`text-[10px] uppercase tracking-wider font-semibold ${
+                              isPast ? "text-slate-300" : isToday ? "text-indigo-600" : "text-slate-400"
+                            }`}
+                          >
+                            {DAY_NAMES[dow]}
+                          </div>
+                          <div className="mt-1 h-8 flex items-center justify-center">
+                            {isToday ? (
+                              <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-base font-semibold ${accent === "violet" ? "bg-violet-600" : "bg-indigo-600"}`}>
+                                {date.getDate()}
+                              </div>
+                            ) : (
+                              <span className={`text-xl font-light ${isPast ? "text-slate-300" : "text-slate-700"}`}>
+                                {date.getDate()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Time grid body */}
+                  <div className="overflow-x-auto">
+                    <div
+                      className="grid relative"
+                      style={{
+                        gridTemplateColumns: "56px repeat(7, minmax(80px, 1fr))",
+                        gridTemplateRows: `repeat(${hours.length}, ${HOUR_HEIGHT}px)`,
+                      }}
+                    >
+                      {/* Time labels */}
+                      {hours.map((h, i) => (
+                        <div
+                          key={`time-${h}`}
+                          className="text-[10px] text-slate-400 pr-2 text-right -mt-1.5"
+                          style={{ gridColumn: 1, gridRow: i + 1 }}
+                        >
+                          {String(h).padStart(2, "0")}:00
+                        </div>
+                      ))}
+
+                      {/* Day cells (background + grid lines) */}
+                      {weekDays.map((date, dayIdx) => {
+                        const isPast = date.getTime() < today.getTime();
+                        const isToday = date.getTime() === today.getTime();
+                        return hours.map((h, hIdx) => (
+                          <div
+                            key={`cell-${dayIdx}-${h}`}
+                            className={`border-l border-t border-slate-100 ${
+                              isPast ? "bg-slate-50/40" : isToday ? "bg-indigo-50/20" : ""
+                            } ${hIdx === hours.length - 1 ? "border-b border-slate-100" : ""}`}
+                            style={{ gridColumn: dayIdx + 2, gridRow: hIdx + 1 }}
+                          />
+                        ));
+                      })}
+
+                      {/* Slot blocks */}
+                      {weekDays.map((date, dayIdx) => {
+                        const isPast = date.getTime() < today.getTime();
+                        const dateStr = formatDateDDMMYYYY(date);
+                        return hours.map((h, hIdx) => {
+                          const cellKey = `${dayIdx}-${h}`;
+                          const cellSlots = slotsByCell[cellKey] || [];
+                          if (cellSlots.length === 0) return null;
+                          return (
+                            <div
+                              key={`slots-${dayIdx}-${h}`}
+                              className="p-1 flex flex-col gap-1 min-w-0"
+                              style={{ gridColumn: dayIdx + 2, gridRow: hIdx + 1 }}
+                            >
+                              {cellSlots.map(slot => {
+                                const alreadyBooked = userBookingsKey.has(`${slot.slotType}|${dateStr}|${slot.time}`);
+                                const blocked = isPast || !hasActiveSub || alreadyBooked;
+                                const blockedReason = isPast
+                                  ? "Дата уже прошла"
+                                  : alreadyBooked
+                                    ? "Вы уже записаны"
+                                    : !hasActiveSub
+                                      ? `Нужен абонемент на ${bookingType === "group" ? "групповые" : "индивидуальные"} занятия`
+                                      : "";
+                                return (
+                                  <button
+                                    key={slot.id}
+                                    onClick={() => {
+                                      if (blocked) return;
+                                      setBookingSlot(slot);
+                                      setBookingDate(dateStr);
+                                    }}
+                                    disabled={blocked}
+                                    title={blockedReason || `Записаться на ${slot.time}`}
+                                    className={`relative flex-1 min-h-0 rounded-md px-1.5 py-1 text-[11px] font-semibold leading-tight text-left border transition-all overflow-hidden ${
+                                      blocked
+                                        ? alreadyBooked
+                                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default"
+                                          : "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
+                                        : accent === "violet"
+                                          ? "bg-violet-100 border-violet-200 text-violet-800 hover:bg-violet-600 hover:border-violet-600 hover:text-white hover:shadow-sm"
+                                          : "bg-indigo-100 border-indigo-200 text-indigo-800 hover:bg-indigo-600 hover:border-indigo-600 hover:text-white hover:shadow-sm"
+                                    }`}
+                                  >
+                                    <span className="block truncate">{slot.time}</span>
+                                    {alreadyBooked && (
+                                      <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full flex items-center justify-center">
+                                        <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        });
+                      })}
+                    </div>
+                  </div>
+
+                  {totalSlotsThisWeek === 0 && (
+                    <div className="border-t border-slate-100 px-6 py-8 text-center">
+                      <p className="text-sm text-slate-500 font-medium">
+                        На этой неделе нет свободных {bookingType === "group" ? "групповых" : "индивидуальных"} занятий
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">Попробуйте переключиться на другую неделю или другой тип занятий</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {slots.length === 0 && (
               <div className="bg-white rounded-2xl border border-dashed border-indigo-200 p-8 text-center">
