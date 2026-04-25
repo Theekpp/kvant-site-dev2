@@ -3,7 +3,7 @@ import { db } from "./db";
 import {
   accounts, refreshTokens, emailTokens, users, bookings, subscriptions, scheduleSlots,
 } from "@shared/schema";
-import { eq, and, gt, desc } from "drizzle-orm";
+import { eq, and, gt, desc, asc } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Resend } from "resend";
@@ -525,6 +525,8 @@ export function registerAuthRoutes(app: Express) {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Неверный id" });
 
+    const CANCELLATION_DEADLINE_HOURS = 24;
+
     try {
       const [account] = await db.select().from(accounts)
         .where(eq(accounts.id, req.accountId!));
@@ -537,10 +539,54 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Можно отменить только подтверждённые занятия" });
       }
 
+      // Validate 24h cancellation window
+      const dm = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(booking.date);
+      const tm = /^(\d{1,2}):(\d{2})$/.exec(booking.time);
+      if (!dm || !tm) {
+        return res.status(400).json({ message: "Некорректные дата/время записи" });
+      }
+      const lessonAt = new Date(
+        Number(dm[3]), Number(dm[2]) - 1, Number(dm[1]),
+        Number(tm[1]), Number(tm[2]), 0, 0
+      );
+      const hoursLeft = (lessonAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      if (hoursLeft < CANCELLATION_DEADLINE_HOURS) {
+        return res.status(400).json({
+          message: `Отмена доступна не позднее чем за ${CANCELLATION_DEADLINE_HOURS} часа до начала занятия.`,
+        });
+      }
+
       const [updated] = await db.update(bookings)
         .set({ status: "cancelled" })
         .where(eq(bookings.id, id))
         .returning();
+
+      // Refund the lesson into an active paid subscription of the same type.
+      // Pick a partially-used active subscription (remainingLessons < totalLessons),
+      // preferring the oldest such sub so it gets used up first.
+      if (booking.paymentMethod === "subscription") {
+        const candidateSubs = await db.select().from(subscriptions)
+          .where(and(
+            eq(subscriptions.userId, account.userId),
+            eq(subscriptions.type, booking.type),
+            eq(subscriptions.isPaid, true),
+            eq(subscriptions.status, "active"),
+          ))
+          .orderBy(asc(subscriptions.createdAt));
+
+        const refundTarget = candidateSubs.find(s => s.remainingLessons < s.totalLessons)
+          || candidateSubs[0];
+        if (refundTarget) {
+          const newRemaining = Math.min(
+            refundTarget.totalLessons,
+            refundTarget.remainingLessons + 1,
+          );
+          await db.update(subscriptions)
+            .set({ remainingLessons: newRemaining })
+            .where(eq(subscriptions.id, refundTarget.id));
+        }
+      }
+
       return res.json(updated);
     } catch {
       return res.status(500).json({ message: "Ошибка сервера" });

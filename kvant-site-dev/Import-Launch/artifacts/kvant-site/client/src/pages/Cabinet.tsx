@@ -66,6 +66,29 @@ const STATUS_LABELS: Record<string, string> = {
 
 function isUpcoming(b: Booking) { return b.status === "confirmed"; }
 
+const CANCELLATION_DEADLINE_HOURS = 24;
+
+function bookingDateTime(b: Booking): Date | null {
+  const dm = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(b.date);
+  const tm = /^(\d{1,2}):(\d{2})$/.exec(b.time);
+  if (!dm || !tm) return null;
+  return new Date(
+    parseInt(dm[3]), parseInt(dm[2]) - 1, parseInt(dm[1]),
+    parseInt(tm[1]), parseInt(tm[2]), 0, 0
+  );
+}
+
+function hoursUntilBooking(b: Booking, now: Date = new Date()): number | null {
+  const dt = bookingDateTime(b);
+  if (!dt) return null;
+  return (dt.getTime() - now.getTime()) / (1000 * 60 * 60);
+}
+
+function canCancelBooking(b: Booking, now: Date = new Date()): boolean {
+  const h = hoursUntilBooking(b, now);
+  return h !== null && h >= CANCELLATION_DEADLINE_HOURS;
+}
+
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
   return (
     <div className={`rounded-2xl p-5 ${color} flex flex-col gap-1`}>
@@ -78,6 +101,11 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
 
 function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: number) => void }) {
   const upcoming = isUpcoming(booking);
+  const cancellable = canCancelBooking(booking);
+  const hoursLeft = hoursUntilBooking(booking);
+  const tooLateTitle = hoursLeft !== null && hoursLeft >= 0
+    ? `Отмена недоступна — до занятия осталось менее ${CANCELLATION_DEADLINE_HOURS} ч`
+    : "Отмена недоступна";
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -96,8 +124,14 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
       </div>
       {upcoming && onCancel ? (
         <button
-          onClick={() => onCancel(booking.id)}
-          className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition flex-shrink-0"
+          onClick={() => cancellable && onCancel(booking.id)}
+          disabled={!cancellable}
+          title={cancellable ? "Отменить запись" : tooLateTitle}
+          className={`text-xs px-3 py-1.5 rounded-lg transition flex-shrink-0 border ${
+            cancellable
+              ? "text-red-500 hover:text-red-700 border-red-200 hover:border-red-400"
+              : "text-slate-300 border-slate-100 cursor-not-allowed"
+          }`}
         >
           Отменить
         </button>
@@ -560,7 +594,17 @@ export default function Cabinet() {
             {/* Recent bookings */}
             {upcomingBookings.length > 0 && (
               <div>
-                <h2 className="text-base font-bold text-slate-800 mb-3">Предстоящие занятия</h2>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h2 className="text-base font-bold text-slate-800">Предстоящие занятия</h2>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3 flex items-start gap-2">
+                  <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  <p className="text-xs text-amber-800 leading-snug">
+                    Отмена и перенос занятия доступны не позднее чем за {CANCELLATION_DEADLINE_HOURS} часа до его начала. При своевременной отмене занятие возвращается в абонемент.
+                  </p>
+                </div>
                 <div className="space-y-2">
                   {upcomingBookings.slice(0, 3).map(b => (
                     <BookingRow key={b.id} booking={b} onCancel={handleCancelBooking} />
