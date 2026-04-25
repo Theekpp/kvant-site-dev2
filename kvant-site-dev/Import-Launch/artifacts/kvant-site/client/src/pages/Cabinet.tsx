@@ -354,10 +354,26 @@ export default function Cabinet() {
     }
   };
 
+  const refreshCabinet = async () => {
+    try {
+      const [bk, sub] = await Promise.all([
+        api.get("/api/cabinet/bookings"),
+        api.get("/api/cabinet/subscriptions"),
+      ]);
+      setBookings(bk.data);
+      setSubscriptions(sub.data);
+    } catch {
+      // silent — UI keeps last known state
+    }
+  };
+
   const handleCancelBooking = async (id: number) => {
     try {
       await api.delete(`/api/cabinet/bookings/${id}`);
+      // Optimistic update for instant feedback
       setBookings(prev => prev.map(b => b.id === id ? { ...b, status: "cancelled" } : b));
+      // Re-sync with server (subscription remainingLessons may have been refunded)
+      await refreshCabinet();
     } catch (err: any) {
       toast({ title: err.response?.data?.message || "Ошибка отмены", variant: "destructive" });
     }
@@ -379,11 +395,14 @@ export default function Cabinet() {
         time: bookingSlot.time,
         groupScheduleId: bookingSlot.slotType === "group" ? bookingSlot.id : undefined,
       });
+      // Optimistic insert for instant feedback
       setBookings(prev => [newBooking.data, ...prev]);
       setBookingSuccess(true);
       setBookingSlot(null);
       setBookingDate("");
       setTimeout(() => setBookingSuccess(false), 3000);
+      // Re-sync with server (subscription remainingLessons has been deducted)
+      await refreshCabinet();
     } catch (err: any) {
       toast({ title: err.response?.data?.message || "Не удалось записаться", variant: "destructive" });
     } finally {
