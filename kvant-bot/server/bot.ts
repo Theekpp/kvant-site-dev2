@@ -182,9 +182,9 @@ function deduplicateSlotsByTime(slotsForDay: ScheduleSlot[], dateStr: string): S
   const specificTimes = new Set(
     slotsForDay.filter(s => s.specificDate === dateStr).map(s => s.time)
   );
-  return slotsForDay.filter(s =>
-    s.specificDate === dateStr || !specificTimes.has(s.time)
-  );
+  return slotsForDay
+    .filter(s => s.specificDate === dateStr || !specificTimes.has(s.time))
+    .sort((a, b) => a.time.localeCompare(b.time));
 }
 
 function computeIndividualFullyBookedDates(
