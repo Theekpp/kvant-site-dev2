@@ -10,41 +10,66 @@ channel = "stable-25_05"
 runButton = "Project"
 
 [[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Telegram Bot"
-
-[[workflows.workflow]]
 name = "Start application"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd kvant-site-dev/Import-Launch && pnpm install --no-frozen-lockfile --prefer-offline && cd artifacts/kvant-site && pnpm run dev"
 waitForPort = 5000
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow]]
 name = "Telegram Bot"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd kvant-bot && pnpm install --no-frozen-lockfile && PORT=8099 NODE_ENV=development node_modules/.bin/tsx server/index.ts"
 waitForPort = 8099
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "kvant-site-dev/Import-Launch/artifacts/api-server: API Server"
+author = "agent"
+mode = "parallel"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+artifactId = "3B4_FFSkEVBkAeYMFRJ2e"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/api-server run dev"
+cwd = "./kvant-site-dev/Import-Launch/artifacts/api-server"
+waitForPort = 8080
+
+[workflows.workflow.tasks.env]
+PORT = "8080"
+
+[[workflows.workflow]]
+name = "kvant-site-dev/Import-Launch/artifacts/mockup-sandbox: Component Preview Server"
+author = "agent"
+mode = "sequential"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+artifactId = "XegfDyZt7HqfW2Bb8Ghoy"
+isCanvasWorkflow = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/mockup-sandbox run dev"
+cwd = "./kvant-site-dev/Import-Launch/artifacts/mockup-sandbox"
+waitForPort = 8081
+
+[workflows.workflow.tasks.env]
+PORT = "8081"
+BASE_PATH = "/__mockup"
 
 [[ports]]
 localPort = 5000
