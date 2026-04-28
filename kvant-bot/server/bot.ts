@@ -5,6 +5,41 @@ import type { User, ScheduleSlot, Booking } from "@shared/schema";
 const DAYS_RU = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
 const DAYS_SHORT_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 
+// Telegram Premium animated emoji IDs.
+// When parse_mode: "HTML" is used, these are wrapped in <tg-emoji> entities.
+// Bots without Premium status will simply show the plain emoji as fallback.
+const PREMIUM_EMOJI: Record<string, string> = {
+  "ℹ️": "5334544901428229844",
+  "👨‍🏫": "5192878415941737629",
+  "🎓": "5348215481683688355",
+  "🏆": "5188344996356448758",
+  "📊": "5231200819986047254",
+  "💡": "5193127592764394874",
+  "⚡": "5373066076558996568",
+  "📖": "5411369574157286161",
+  "1️⃣": "5445379470259135284",
+  "👥": "5258513401784573443",
+  "💳": "5472250091332993630",
+  "📚": "5451753704237587285",
+  "📞": "5253507424127557691",
+  "💬": "5443038326535759644",
+  "💰": "5224257782013769471",
+  "❓": "5436113877181941026",
+  "📝": "5767346320599682247",
+  "🗓": "5413879192267805083",
+  "✏️": "5395444784611480792",
+  "🎯": "5310278924616356636",
+  "💻": "5193177581888755275",
+  "🔔": "5291970531300505408",
+  "🚀": "5188481279963715781",
+  "👇": "5301038027601098171",
+};
+
+function pe(emoji: string): string {
+  const id = PREMIUM_EMOJI[emoji];
+  return id ? `<tg-emoji emoji-id="${id}">${emoji}</tg-emoji>` : emoji;
+}
+
 const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "📝 Записаться на занятие" }, { text: "💰 Услуги и оплата" }],
@@ -949,8 +984,9 @@ async function sendIndividualSlotsForDate(bot: TelegramBot, chatId: number, date
 
 async function sendServicesMenu(bot: TelegramBot, chatId: number) {
   await bot.sendMessage(chatId,
-    "💰 Услуги и оплата\n\nВыбери интересующую услугу:",
+    `${pe("💰")} Услуги и оплата\n\nВыбери интересующую услугу:`,
     {
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
           [{ text: "👤 Индивидуальное занятие", callback_data: "service_individual" }],
@@ -1173,12 +1209,12 @@ async function sendMyBookings(bot: TelegramBot, chatId: number) {
   const activeBookings = bookings.filter(b => b.status === "confirmed" || b.status === "pending");
   const activeSubs = subs.filter(s => s.isPaid && s.remainingLessons > 0);
 
-  let msg = "📋 Твои данные:\n\n";
+  let msg = `${pe("📝")} Твои данные:\n\n`;
 
   if (activeBookings.length === 0) {
-    msg += "📅 Записей нет. Нажми «📝 Записаться на занятие», чтобы выбрать время.\n\n";
+    msg += `${pe("🗓")} Записей нет. Нажми «${pe("✏️")} Записаться на занятие», чтобы выбрать время.\n\n`;
   } else {
-    msg += "📅 Ближайшие занятия:\n";
+    msg += `${pe("🗓")} Ближайшие занятия:\n`;
     for (const b of activeBookings) {
       const typeText = b.type === "individual" ? "Инд." : "Груп.";
       const statusText = b.status === "pending" ? " ⏳" : " ✅";
@@ -1188,7 +1224,7 @@ async function sendMyBookings(bot: TelegramBot, chatId: number) {
   }
 
   if (activeSubs.length > 0) {
-    msg += "💳 Активные абонементы:\n";
+    msg += `${pe("💳")} Активные абонементы:\n`;
     for (const s of activeSubs) {
       const typeText = s.type === "individual" ? "Индивидуальный" : "Групповой";
       msg += `• ${typeText}: осталось ${s.remainingLessons} из ${s.totalLessons} занятий\n`;
@@ -1199,63 +1235,67 @@ async function sendMyBookings(bot: TelegramBot, chatId: number) {
     }
   }
 
-  await bot.sendMessage(chatId, msg, { reply_markup: MAIN_KEYBOARD });
+  await bot.sendMessage(chatId, msg, { reply_markup: MAIN_KEYBOARD, parse_mode: "HTML" });
 }
 
 async function sendAboutMentor(bot: TelegramBot, chatId: number) {
   await bot.sendMessage(chatId,
-    `ℹ️ О преподавателе\n\n` +
-    `👨‍🏫 Кирилл — репетитор по физике с опытом более 2 лет\n\n` +
-    `🎓 Образование:\n` +
+    `${pe("ℹ️")} О преподавателе\n\n` +
+    `${pe("👨‍🏫")} Кирилл — репетитор по физике с опытом более 2 лет\n\n` +
+    `${pe("🎓")} Образование:\n` +
     `РГУ нефти и газа имени Губкина\n` +
     `Факультет инженерной механики\n\n` +
-    `📊 Опыт и результаты:\n` +
+    `${pe("📊")} Опыт и результаты:\n` +
     `• более 200 учеников прошли через занятия\n` +
     `• подготовка к ОГЭ по физике\n` +
     `• повышение успеваемости (7–11 класс)\n` +
     `• помощь в разборе сложных задач и тем\n\n` +
-    `💡 Подход к обучению:\n` +
+    `${pe("💡")} Подход к обучению:\n` +
     `• объясняю до полного понимания, а не «по шаблону»\n` +
     `• делаю упор на логику и мышление\n` +
     `• подстраиваюсь под уровень каждого ученика\n\n` +
-    `⚡️ Немного обо мне:\n` +
+    `${pe("⚡")} Немного обо мне:\n` +
     `Активно занимаюсь спортом, 7 лет играл в футбол на профессиональном уровне. Считаю, что дисциплина и системность напрямую влияют на результат — и в учебе тоже`,
-    { reply_markup: MAIN_KEYBOARD }
+    { reply_markup: MAIN_KEYBOARD, parse_mode: "HTML" }
   );
 }
 
 async function sendContacts(bot: TelegramBot, chatId: number) {
   await bot.sendMessage(chatId,
-    `📞 Контакты\n\n` +
-    `💬 Telegram: @anisimovvd\n` +
-    `📱 Телефон: +7 (964) 882-36-78\n\n` +
+    `${pe("📞")} Контакты\n\n` +
+    `${pe("💬")} Telegram: @anisimovvd\n` +
+    `${pe("📞")} Телефон: +7 (964) 882-36-78\n\n` +
     `Кирилл на связи с 9:00 до 21:00`,
-    { reply_markup: MAIN_KEYBOARD }
+    { reply_markup: MAIN_KEYBOARD, parse_mode: "HTML" }
   );
 }
 
 async function sendAskQuestion(bot: TelegramBot, chatId: number) {
   setState(chatId, "ask_question", {});
   await bot.sendMessage(chatId,
-    "❓ Напиши свой вопрос, и Кирилл ответит тебе в ближайшее время:",
-    { reply_markup: { keyboard: [[{ text: "❌ Отмена" }]], resize_keyboard: true } }
+    `${pe("❓")} Напиши свой вопрос, и Кирилл ответит тебе в ближайшее время:`,
+    {
+      reply_markup: { keyboard: [[{ text: "❌ Отмена" }]], resize_keyboard: true },
+      parse_mode: "HTML",
+    }
   );
 }
 
 async function sendFormatInfo(bot: TelegramBot, chatId: number) {
   await bot.sendMessage(chatId,
-    `🎯 Как проходят наши занятия?\n\n` +
+    `${pe("🎯")} Как проходят наши занятия?\n\n` +
     `Я сделал обучение максимально комфортным и эффективным, чтобы ты видел прогресс уже после первой недели:\n\n` +
-    `💻 Где занимаемся?\n` +
+    `${pe("💻")} Где занимаемся?\n` +
     `Уроки проходят в формате Live-стримов (Teams / Яндекс Телемост). Это полноценная замена оффлайну: мы используем интерактивную доску, я вижу, как ты решаешь задачу, а ты — все мои записи в реальном времени.\n\n` +
-    `📊 Как это работает?\n\n` +
+    `${pe("📊")} Как это работает?\n\n` +
     `Индивидуальный трек: Никаких общих программ. Я адаптирую план под твои цели — будь то подготовка к экзамену или закрытие пробелов в школьной программе.\n\n` +
     `Материалы всегда под рукой: После каждого занятия ты получаешь конспект, записи урока и домашнее задание в удобном формате, и даже можешь зайти глянуть все наши записи на нашу с тобой доску.\n\n` +
-    `Связь 24/7: Возник вопрос по задаче, пока делаешь домашку? Пиши мне в личку — разберём и закроем вопрос до следующего урока.\n\n` +
-    `🚀 Результат — это главное\n` +
+    `${pe("🔔")} Связь 24/7: Возник вопрос по задаче, пока делаешь домашку? Пиши мне в личку — разберём и закроем вопрос до следующего урока.\n\n` +
+    `${pe("🚀")} Результат — это главное\n` +
     `Мы не просто «зубрим» теорию. Мы учимся применять её на практике, чтобы ты чувствовал себя уверенно и на контрольной, и на реальном экзамене.\n\n` +
-    `Готов начать? 👇 Жми кнопку ниже, чтобы записаться и обсудить твою цель!`,
+    `Готов начать? ${pe("👇")} Жми кнопку ниже, чтобы записаться и обсудить твою цель!`,
     {
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
           [{ text: "📝 Записаться на занятие", callback_data: "book_lesson" }],
