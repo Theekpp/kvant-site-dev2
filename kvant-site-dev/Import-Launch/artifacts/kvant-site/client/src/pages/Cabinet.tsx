@@ -412,7 +412,7 @@ export default function Cabinet() {
 
   const upcomingBookings = bookings.filter(isUpcoming);
   const pastBookings = bookings.filter(b => !isUpcoming(b));
-  const activeSubs = subscriptions.filter(s => s.remainingLessons > 0);
+  const activeSubs = subscriptions.filter(s => s.isPaid && s.remainingLessons > 0);
   const totalRemaining = activeSubs.reduce((a, s) => a + s.remainingLessons, 0);
   const nextLesson = upcomingBookings[0];
 
