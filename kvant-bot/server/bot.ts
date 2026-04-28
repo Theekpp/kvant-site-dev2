@@ -13,8 +13,8 @@ const PREMIUM_EMOJI: Record<string, string> = {
   "👨‍🏫": "5192878415941737629",
   "🎓": "5348215481683688355",
   "🏆": "5188344996356448758",
-  "📊": "5231200819986047254",
   "💡": "5193127592764394874",
+  "📊": "5231200819986047254",
   "⚡": "5373066076558996568",
   "📖": "5411369574157286161",
   "1️⃣": "5445379470259135284",
@@ -22,6 +22,7 @@ const PREMIUM_EMOJI: Record<string, string> = {
   "💳": "5472250091332993630",
   "📚": "5451753704237587285",
   "📞": "5253507424127557691",
+  "📱": "5253596497454310931",
   "💬": "5443038326535759644",
   "💰": "5224257782013769471",
   "❓": "5436113877181941026",
@@ -990,7 +991,7 @@ async function sendServicesMenu(bot: TelegramBot, chatId: number) {
       reply_markup: {
         inline_keyboard: [
           [{ text: "👤 Индивидуальное занятие", callback_data: "service_individual" }],
-          [{ text: "👥 Групповое занятие", callback_data: "service_group" }],
+          [{ text: "${pe("👥")} Групповое занятие", callback_data: "service_group" }],
           [{ text: "💳 Абонемент на 4 занятия", callback_data: "service_sub4" }],
           [{ text: "💳 Абонемент на 8 занятий", callback_data: "service_sub8" }],
         ],
@@ -1024,8 +1025,9 @@ async function sendScheduleSlotSelection(bot: TelegramBot, chatId: number) {
   const calKeyboard = buildCalendarKeyboard(availableDays, specificDates, "cal_grp", undefined, undefined, fullyBookedDates);
 
   await bot.sendMessage(chatId,
-    `👥 Выбери дату группового занятия:`,
-    { reply_markup: calKeyboard }
+    `${pe("👥")} Услуги и оплата\n\nВыбери интересующую услугу:`,
+    ` Выбери дату группового занятия:`,
+    { parse_mode: "HTML", reply_markup: calKeyboard }
   );
 }
 
