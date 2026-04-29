@@ -48,6 +48,36 @@ Set via SQL: `UPDATE accounts SET role='admin' WHERE email='your@email.com';`
 - `/terms` — Пользовательское соглашение
 - `/refund` — Условия возврата
 
+## Collaboration Board (kvant-board)
+
+A self-hosted Excalidraw collaboration whiteboard, lives in `kvant-board/`
+(standalone project, not part of the pnpm workspace).
+
+- Workflow `Excalidraw Board` runs `tsx server/index.ts` on port 8000.
+  Express + Socket.IO (path `/board-ws`) + Vite dev middleware.
+- Vite is configured with `base: "/board-app/"` so all asset URLs are
+  prefixed and survive the site reverse-proxy.
+- The site (`kvant-site`) reverse-proxies two prefixes to the board on
+  port 8000 via `http-proxy-middleware`:
+  - `/board-app/**` — board HTML/JS/CSS (HTTP + WS for Vite HMR)
+  - `/board-ws/**` — Socket.IO collaboration channel
+  Mounted with a `pathFilter` function (NOT Express mount path) so the
+  full URL (including the prefix) is forwarded unchanged.
+- Each booking row carries `room_id` (UUID, unique). Site issues this on
+  `POST /api/cabinet/bookings`; bot does the same in `bot.ts`.
+- Site route `/board/:roomId` (protected) renders `Board.tsx`, which embeds
+  `/board-app/index.html?room=<id>&name=<displayName>` in an iframe.
+- "Открыть доску" button on each booking row in the cabinet links there.
+- Bot sends the board link in:
+  - The 10:00 daily reminder for next-day bookings.
+  - A new "30 minutes before" reminder driven by a `*/5 * * * *` cron in
+    `kvant-bot/server/reminders.ts`. It uses `parseBookingDateTime` and a
+    `soonRemindedIds` Set to send each booking's reminder at most once.
+  - Board URL is built from `SITE_URL` or `FRONTEND_URL` env vars.
+- In Replit dev, Socket.IO connects via long-polling fallback (WebSocket
+  upgrade through the dev proxy is unreliable). Production deployments
+  with a proper WS-aware reverse proxy can use full WebSocket transport.
+
 Placeholders `[ФИО]` and `[ИНН]` in legal docs must be replaced with real data before going to production.
 
 ## Booking Calendar Architecture

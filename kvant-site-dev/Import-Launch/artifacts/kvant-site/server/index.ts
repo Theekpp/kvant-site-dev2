@@ -1,11 +1,39 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
+import { createProxyMiddleware } from "http-proxy-middleware";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Proxy to kvant-board service (Excalidraw collaboration board)
+// Mounted BEFORE body parsers so request bodies are streamed unmodified.
+const BOARD_TARGET =
+  process.env.BOARD_INTERNAL_URL || "http://localhost:8000";
+const boardProxy = createProxyMiddleware({
+  pathFilter: (pathname: string) => pathname.startsWith("/board-app"),
+  target: BOARD_TARGET,
+  changeOrigin: true,
+  ws: true,
+});
+const boardWsProxy = createProxyMiddleware({
+  pathFilter: (pathname: string) => pathname.startsWith("/board-ws"),
+  target: BOARD_TARGET,
+  changeOrigin: true,
+  ws: true,
+});
+app.use(boardProxy);
+app.use(boardWsProxy);
+// Forward HTTP UPGRADE (WebSocket handshake) on the underlying http server
+httpServer.on("upgrade", (req, socket, head) => {
+  if (req.url && req.url.startsWith("/board-ws")) {
+    (boardWsProxy as any).upgrade(req, socket, head);
+  } else if (req.url && req.url.startsWith("/board-app")) {
+    (boardProxy as any).upgrade(req, socket, head);
+  }
+});
 
 declare module "http" {
   interface IncomingMessage {

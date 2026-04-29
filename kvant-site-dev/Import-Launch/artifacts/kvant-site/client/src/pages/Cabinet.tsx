@@ -22,6 +22,7 @@ interface Booking {
   date: string;
   time: string;
   status: string;
+  roomId: string | null;
   createdAt: string;
 }
 
@@ -122,6 +123,17 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
         <p className="font-semibold text-slate-800 text-sm">{TYPE_LABELS[booking.type] || booking.type}</p>
         <p className="text-xs text-slate-400 mt-0.5">{booking.date} · {booking.time}</p>
       </div>
+      {upcoming && booking.roomId ? (
+        <a
+          href={`/board/${booking.roomId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs px-3 py-1.5 rounded-lg transition flex-shrink-0 border border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-400"
+          title="Открыть доску занятия"
+        >
+          Открыть доску
+        </a>
+      ) : null}
       {upcoming && onCancel ? (
         <button
           onClick={() => cancellable && onCancel(booking.id)}

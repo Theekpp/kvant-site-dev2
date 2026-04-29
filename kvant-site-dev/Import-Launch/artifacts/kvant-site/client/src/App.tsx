@@ -9,6 +9,7 @@ import VerifyEmail from "@/pages/VerifyEmail";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import Cabinet from "@/pages/Cabinet";
+import Board from "@/pages/Board";
 import Offer from "@/pages/legal/Offer";
 import Privacy from "@/pages/legal/Privacy";
 import Terms from "@/pages/legal/Terms";
@@ -35,6 +36,13 @@ function Router() {
         {() => (
           <ProtectedRoute>
             <Cabinet />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/board/:roomId">
+        {() => (
+          <ProtectedRoute>
+            <Board />
           </ProtectedRoute>
         )}
       </Route>

@@ -991,7 +991,7 @@ async function sendServicesMenu(bot: TelegramBot, chatId: number) {
       reply_markup: {
         inline_keyboard: [
           [{ text: "👤 Индивидуальное занятие", callback_data: "service_individual" }],
-          [{ text: "${pe("👥")} Групповое занятие", callback_data: "service_group" }],
+          [{ text: "👥 Групповое занятие", callback_data: "service_group" }],
           [{ text: "💳 Абонемент на 4 занятия", callback_data: "service_sub4" }],
           [{ text: "💳 Абонемент на 8 занятий", callback_data: "service_sub8" }],
         ],
@@ -1161,6 +1161,7 @@ async function finalizeBooking(bot: TelegramBot, chatId: number, data: Record<st
     }
   }
 
+  const { randomUUID } = await import("crypto");
   const booking = await storage.createBooking({
     userId: user.id,
     type: data.type,
@@ -1169,6 +1170,7 @@ async function finalizeBooking(bot: TelegramBot, chatId: number, data: Record<st
     status: "pending",
     isPaid: false,
     groupScheduleId: data.groupScheduleId || null,
+    roomId: randomUUID(),
   });
 
   const typeText = data.type === "individual" ? "Индивидуальное" : "Групповое";

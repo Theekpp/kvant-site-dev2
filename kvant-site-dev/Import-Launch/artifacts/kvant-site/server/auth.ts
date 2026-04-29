@@ -498,7 +498,8 @@ export function registerAuthRoutes(app: Express) {
         });
       }
 
-      // Create the confirmed, paid booking
+      // Create the confirmed, paid booking with a unique board room id
+      const { randomUUID } = await import("crypto");
       const [booking] = await db.insert(bookings).values({
         userId: account.userId,
         type,
@@ -508,6 +509,7 @@ export function registerAuthRoutes(app: Express) {
         status: "confirmed",
         isPaid: true,
         paymentMethod: "subscription",
+        roomId: randomUUID(),
       }).returning();
 
       // Deduct one lesson from the subscription

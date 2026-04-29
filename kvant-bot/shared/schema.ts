@@ -47,6 +47,7 @@ export const bookings = pgTable("bookings", {
   isPaid: boolean("is_paid").default(false).notNull(),
   paymentMethod: text("payment_method"),
   groupScheduleId: integer("group_schedule_id").references(() => scheduleSlots.id),
+  roomId: text("room_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
