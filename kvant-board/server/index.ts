@@ -35,6 +35,60 @@ async function main() {
   type ClientInfo = { id: string; name: string };
   const roomMembers = new Map<string, Map<string /* socketId */, ClientInfo>>();
 
+  // ---------- Persistent per-room scene storage ----------
+  // Each room's latest scene is kept in memory and mirrored to disk
+  // so that a page refresh (or even a server restart) does not wipe
+  // the whiteboard.
+  const dataDir = path.resolve(import.meta.dirname, "..", "data", "rooms");
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  const roomScenes = new Map<string, unknown[]>();
+  const safeRoomId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const sceneFileFor = (id: string) =>
+    path.join(dataDir, `${safeRoomId(id)}.json`);
+
+  // Load existing rooms from disk on startup
+  try {
+    for (const f of fs.readdirSync(dataDir)) {
+      if (!f.endsWith(".json")) continue;
+      try {
+        const raw = fs.readFileSync(path.join(dataDir, f), "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.elements)) {
+          const id = f.replace(/\.json$/, "");
+          roomScenes.set(id, parsed.elements);
+        }
+      } catch (err) {
+        log(`failed to load scene ${f}: ${(err as Error).message}`);
+      }
+    }
+    log(`loaded ${roomScenes.size} persisted room scene(s)`);
+  } catch (err) {
+    log(`scene load skipped: ${(err as Error).message}`);
+  }
+
+  // Debounced disk writer to avoid hammering FS on every tiny edit.
+  const writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const SCENE_PERSIST_DEBOUNCE_MS = 750;
+  function persistRoom(roomId: string) {
+    const existing = writeTimers.get(roomId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      const elements = roomScenes.get(roomId);
+      if (!elements) return;
+      try {
+        fs.writeFileSync(
+          sceneFileFor(roomId),
+          JSON.stringify({ elements, savedAt: Date.now() }),
+          "utf-8",
+        );
+      } catch (err) {
+        log(`persist room ${roomId} failed: ${(err as Error).message}`);
+      }
+    }, SCENE_PERSIST_DEBOUNCE_MS);
+    writeTimers.set(roomId, timer);
+  }
+
   io.on("connection", (socket) => {
     let joinedRoom: string | null = null;
     let myInfo: ClientInfo | null = null;
@@ -54,8 +108,13 @@ async function main() {
         if (!roomMembers.has(roomId)) roomMembers.set(roomId, new Map());
         roomMembers.get(roomId)!.set(socket.id, myInfo);
 
+        // Send the persisted scene to the freshly joined client so a page
+        // refresh (or first-ever join) restores the whiteboard immediately.
+        const stored = roomScenes.get(roomId);
+        socket.emit("scene-init", { elements: stored ?? [] });
+
         log(
-          `socket ${socket.id} joined room ${roomId} as ${myInfo.name} (${roomMembers.get(roomId)!.size} in room)`,
+          `socket ${socket.id} joined room ${roomId} as ${myInfo.name} (${roomMembers.get(roomId)!.size} in room, ${stored?.length ?? 0} stored elements)`,
         );
       },
     );
@@ -64,6 +123,10 @@ async function main() {
       "scene-update",
       (payload: { roomId: string; elements: unknown[] }) => {
         if (!payload?.roomId || joinedRoom !== payload.roomId) return;
+        if (!Array.isArray(payload.elements)) return;
+        // Persist the latest scene so refreshes / restarts don't wipe it.
+        roomScenes.set(payload.roomId, payload.elements);
+        persistRoom(payload.roomId);
         socket.to(payload.roomId).emit("scene-update", {
           elements: payload.elements,
         });

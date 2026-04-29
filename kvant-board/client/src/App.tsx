@@ -59,6 +59,10 @@ export default function App() {
   const lastSentSceneVersionRef = useRef<string>("");
   const sceneSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPointerSentRef = useRef<number>(0);
+  // Becomes true once the server has sent us the persisted scene for this
+  // room (or confirmed the room is empty). Until then we MUST NOT broadcast
+  // our own (empty) scene, otherwise a refresh would wipe everyone else.
+  const initialSceneLoadedRef = useRef<boolean>(false);
 
   // Connect socket
   useEffect(() => {
@@ -72,6 +76,30 @@ export default function App() {
     socket.on("connect", () => {
       socket.emit("join-room", { roomId, name: username, id: myId });
     });
+
+    socket.on(
+      "scene-init",
+      (payload: { elements: ExcalidrawElement[] }) => {
+        const remote = payload.elements || [];
+        if (api) {
+          const local = api.getSceneElementsIncludingDeleted();
+          const reconciled = reconcileElements(
+            local,
+            remote as any,
+            api.getAppState(),
+          );
+          api.updateScene({ elements: reconciled });
+        }
+        // Seed the version signature so we don't immediately re-broadcast
+        // the same scene we just received from the server.
+        const version = `${remote.length}-${remote.reduce(
+          (acc: number, el: any) => acc + (el?.version || 0),
+          0,
+        )}`;
+        lastSentSceneVersionRef.current = version;
+        initialSceneLoadedRef.current = true;
+      },
+    );
 
     socket.on("scene-update", (payload: { elements: ExcalidrawElement[] }) => {
       if (!api) return;
@@ -127,39 +155,16 @@ export default function App() {
     api.updateScene({ collaborators });
   }, [api, collaborators]);
 
-  // Request initial scene from any peer once API ready
-  useEffect(() => {
-    if (!api || !socketRef.current) return;
-    socketRef.current.emit("request-scene", { roomId });
-    const handler = ({ requesterId }: { requesterId: string }) => {
-      const elements = api.getSceneElementsIncludingDeleted();
-      socketRef.current?.emit("scene-snapshot", {
-        toId: requesterId,
-        elements,
-      });
-    };
-    socketRef.current.on("scene-request", handler);
-    socketRef.current.on(
-      "scene-snapshot",
-      (payload: { elements: ExcalidrawElement[] }) => {
-        const remote = payload.elements || [];
-        const local = api.getSceneElementsIncludingDeleted();
-        const reconciled = reconcileElements(
-          local,
-          remote as any,
-          api.getAppState(),
-        );
-        api.updateScene({ elements: reconciled });
-      },
-    );
-    return () => {
-      socketRef.current?.off("scene-request", handler);
-    };
-  }, [api, roomId]);
+  // Initial scene is now sent by the server via "scene-init" right after
+  // join-room, so no per-peer snapshot dance is needed.
 
   const handleChange = (elements: readonly ExcalidrawElement[]) => {
     if (!socketRef.current) return;
     if (readOnly) return;
+    // Don't broadcast anything until the server has hydrated us with the
+    // persisted scene. Otherwise a brand-new (empty) client would race the
+    // server's scene-init and wipe the room for everyone else.
+    if (!initialSceneLoadedRef.current) return;
     // Compute lightweight version signature to dedupe
     const version = `${elements.length}-${elements.reduce(
       (acc, el) => acc + (el as any).version,
