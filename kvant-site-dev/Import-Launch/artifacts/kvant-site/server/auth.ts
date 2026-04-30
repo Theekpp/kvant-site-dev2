@@ -399,6 +399,28 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // ── Cabinet: Board room (one permanent room per user) ─────────────────────
+  app.get("/api/cabinet/board-room", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select({ userId: accounts.userId })
+        .from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.status(404).json({ message: "Профиль ученика не привязан" });
+
+      const [user] = await db.select({ id: users.id, boardRoomId: users.boardRoomId })
+        .from(users).where(eq(users.id, account.userId));
+      if (!user) return res.status(404).json({ message: "Ученик не найден" });
+
+      let { boardRoomId } = user;
+      if (!boardRoomId) {
+        boardRoomId = crypto.randomUUID();
+        await db.update(users).set({ boardRoomId }).where(eq(users.id, user.id));
+      }
+      return res.json({ boardRoomId });
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
   // ── Cabinet: Profile ──────────────────────────────────────────────────────
   app.get("/api/cabinet/me", requireAuth, async (req, res) => {
     try {

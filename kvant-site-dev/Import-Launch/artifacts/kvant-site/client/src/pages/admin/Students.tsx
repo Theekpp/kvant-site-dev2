@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserCircle2, UserPlus, Phone, ExternalLink, CalendarCheck, CreditCard, Banknote, Clock } from "lucide-react";
+import { UserCircle2, UserPlus, Phone, ExternalLink, CalendarCheck, CreditCard, Banknote, Clock, Monitor } from "lucide-react";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -102,6 +102,19 @@ function StudentCard({ userId, onClose }: { userId: number; onClose: () => void 
             <ExternalLink className="h-4 w-4 text-muted-foreground" />
             <a href={`https://t.me/${user.telegramUsername}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
               @{user.telegramUsername}
+            </a>
+          </div>
+        )}
+        {user.boardRoomId && (
+          <div className="flex items-center gap-2">
+            <Monitor className="h-4 w-4 text-muted-foreground" />
+            <a
+              href={`/board/${user.boardRoomId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline font-medium"
+            >
+              Открыть доску ученика
             </a>
           </div>
         )}
@@ -325,8 +338,23 @@ export default function Students() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {format(parseISO(user.createdAt), 'dd MMM yyyy', { locale: ru })}
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-sm text-muted-foreground">{format(parseISO(user.createdAt), 'dd MMM yyyy', { locale: ru })}</span>
+                        {user.boardRoomId && (
+                          <a
+                            href={`/board/${user.boardRoomId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors whitespace-nowrap no-default-active-elevate"
+                            title="Открыть доску ученика"
+                          >
+                            <Monitor className="h-3 w-3" />
+                            Доска
+                          </a>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

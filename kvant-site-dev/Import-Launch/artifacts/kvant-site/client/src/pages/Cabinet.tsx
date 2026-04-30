@@ -123,17 +123,6 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
         <p className="font-semibold text-slate-800 text-sm">{TYPE_LABELS[booking.type] || booking.type}</p>
         <p className="text-xs text-slate-400 mt-0.5">{booking.date} · {booking.time}</p>
       </div>
-      {upcoming && booking.roomId ? (
-        <a
-          href={`/board/${booking.roomId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs px-3 py-1.5 rounded-lg transition flex-shrink-0 border border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-400"
-          title="Открыть доску занятия"
-        >
-          Открыть доску
-        </a>
-      ) : null}
       {upcoming && onCancel ? (
         <button
           onClick={() => cancellable && onCancel(booking.id)}
@@ -169,6 +158,7 @@ export default function Cabinet() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [boardRoomId, setBoardRoomId] = useState<string | null>(null);
 
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState({ firstName: "", phone: "" });
@@ -283,13 +273,15 @@ export default function Cabinet() {
       api.get("/api/cabinet/bookings"),
       api.get("/api/cabinet/subscriptions"),
       api.get("/api/schedule"),
-    ]).then(([me, bk, sub, sc]) => {
+      api.get("/api/cabinet/board-room").catch(() => null),
+    ]).then(([me, bk, sub, sc, br]) => {
       setAccount(me.data);
       setEditData({ firstName: me.data.firstName || "", phone: me.data.phone || "" });
       setBookings(bk.data);
       setSubscriptions(sub.data);
       setSlots(Array.isArray(sc.data) ? sc.data : []);
       checkUnpaidSubscriptions(sub.data);
+      if (br?.data?.boardRoomId) setBoardRoomId(br.data.boardRoomId);
     });
 
     if (paymentParam === "success") {
@@ -620,6 +612,24 @@ export default function Cabinet() {
                   <p className="text-xs text-slate-400 mt-0.5">{activeSubs.length} активных · {totalRemaining} занятий</p>
                 </div>
               </button>
+              {boardRoomId && (
+                <a
+                  href={`/board/${boardRoomId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-4 text-left hover:border-teal-300 hover:shadow-md transition-all group col-span-full sm:col-span-2"
+                >
+                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center group-hover:bg-teal-600 transition-colors flex-shrink-0">
+                    <svg className="w-5 h-5 text-teal-600 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800 text-sm">Моя онлайн-доска</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Совместная доска с преподавателем — доступна всегда</p>
+                  </div>
+                </a>
+              )}
             </div>
 
             {/* Recent bookings */}

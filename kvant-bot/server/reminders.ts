@@ -37,8 +37,8 @@ export function setupReminders(bot: TelegramBot) {
         const user = users.find(u => u.id === booking.userId);
         if (!user || !user.telegramId) continue;
 
-        const boardLine = booking.roomId
-          ? `\n\u{1F5BC} Доска занятия: ${boardLinkFor(booking.roomId)}\n`
+        const boardLine = user.boardRoomId
+          ? `\n\u{1F5BC} Онлайн-доска: ${boardLinkFor(user.boardRoomId)}\n`
           : "";
 
         try {
@@ -98,14 +98,14 @@ export function setupReminders(bot: TelegramBot) {
         const user = users.find(u => u.id === booking.userId);
         if (!user || !user.telegramId) continue;
 
-        const link = boardLinkFor(booking.roomId);
+        const link = boardLinkFor(user.boardRoomId);
         try {
           await bot.sendMessage(
             user.telegramId,
             `\u{23F0} Занятие через 30 минут!\n\n` +
               `Привет, ${user.firstName || "друг"}! ${booking.type === "individual" ? "Индивидуальное" : "Групповое"} занятие по физике начнётся скоро.\n\n` +
               `\u{23F0} Время: ${booking.time}\n` +
-              (link ? `\u{1F5BC} Доска занятия: ${link}\n\n` : "\n") +
+              (link ? `\u{1F5BC} Онлайн-доска: ${link}\n\n` : "\n") +
               `Заходи на доску заранее, чтобы всё успеть подготовить.`,
           );
           soonRemindedIds.add(booking.id);

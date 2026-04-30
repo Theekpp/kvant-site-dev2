@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   telegramUsername: text("telegram_username"),
   name: text("name"),
+  boardRoomId: text("board_room_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
