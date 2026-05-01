@@ -708,7 +708,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  app.post("/api/admin/video-token", requireAdmin, async (req, res) => {
+  app.post("/api/admin/video-token", requireAuth, requireAdmin, async (req, res) => {
     const { bookingId, roomName: rawRoom } = req.body;
     if (!bookingId && !rawRoom) return res.status(400).json({ message: "bookingId или roomName обязателен" });
     try {
