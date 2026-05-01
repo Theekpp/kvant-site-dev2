@@ -67,7 +67,13 @@ export function BookingCalendar({
   onSelectSlot,
 }: BookingCalendarProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode);
-  const [viewOffset, setViewOffset] = useState(0);
+  const [viewOffset, setViewOffset] = useState(() => {
+    const mode = getInitialViewMode();
+    if (mode >= 7) return 0;
+    const jsDay = new Date().getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const todayIdx = jsDay === 0 ? 6 : jsDay - 1; // Mon-based 0..6
+    return Math.max(0, Math.min(todayIdx - Math.floor(mode / 2), 7 - mode));
+  });
 
   // Auto-adapt view mode to viewport changes
   useEffect(() => {
@@ -86,15 +92,26 @@ export function BookingCalendar({
     };
   }, []);
 
-  // Reset offset whenever week changes or view mode changes
-  useEffect(() => {
-    setViewOffset(0);
-  }, [weekStart, viewMode]);
-
   const weekDays = useMemo<Date[]>(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   );
+
+  // When week or view mode changes, set offset so today is visible (if in this week)
+  useEffect(() => {
+    const todayIdx = weekDays.findIndex(
+      (d) =>
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate(),
+    );
+    if (todayIdx >= 0 && viewMode < 7) {
+      const offset = Math.max(0, Math.min(todayIdx - Math.floor(viewMode / 2), 7 - viewMode));
+      setViewOffset(offset);
+    } else {
+      setViewOffset(0);
+    }
+  }, [weekStart, viewMode, weekDays, today]);
 
   const userBookingsKey = useMemo(() => {
     const set = new Set<string>();
