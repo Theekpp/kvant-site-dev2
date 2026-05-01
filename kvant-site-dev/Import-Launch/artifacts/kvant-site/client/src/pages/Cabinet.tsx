@@ -123,6 +123,17 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
         <p className="font-semibold text-slate-800 text-sm">{TYPE_LABELS[booking.type] || booking.type}</p>
         <p className="text-xs text-slate-400 mt-0.5">{booking.date} · {booking.time}</p>
       </div>
+      {upcoming && (
+        <a
+          href={`/video/booking-${booking.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs px-3 py-1.5 rounded-lg transition flex-shrink-0 border border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-400 whitespace-nowrap"
+          title="Войти в видеоконференцию"
+        >
+          📹 Конференция
+        </a>
+      )}
       {upcoming && onCancel ? (
         <button
           onClick={() => cancellable && onCancel(booking.id)}

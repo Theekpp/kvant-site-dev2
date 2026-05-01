@@ -10,6 +10,10 @@ import { Resend } from "resend";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import crypto from "crypto";
+import { AccessToken } from "livekit-server-sdk";
+
+const LK_API_KEY = process.env.LIVEKIT_API_KEY || "APIE489774A8A86034D";
+const LK_API_SECRET = process.env.LIVEKIT_API_SECRET || "e27ffd8d0268aa8c9f9ef04e2c2e3f7e7b9c69a9f78d2fe979370c073a06f6bb";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
@@ -672,6 +676,57 @@ export function registerAuthRoutes(app: Express) {
       const slots = await db.select().from(scheduleSlots)
         .where(eq(scheduleSlots.isActive, true));
       return res.json(slots);
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Video conference tokens ────────────────────────────────────────────────
+
+  app.post("/api/cabinet/video-token", requireAuth, async (req, res) => {
+    const { bookingId } = req.body;
+    if (!bookingId) return res.status(400).json({ message: "bookingId обязателен" });
+    try {
+      const [account] = await db.select({ userId: accounts.userId, firstName: accounts.firstName })
+        .from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.status(403).json({ message: "Нет профиля ученика" });
+
+      const [booking] = await db.select({ id: bookings.id, userId: bookings.userId })
+        .from(bookings).where(and(eq(bookings.id, Number(bookingId)), eq(bookings.userId, account.userId)));
+      if (!booking) return res.status(403).json({ message: "Запись не найдена" });
+
+      const roomName = `booking-${booking.id}`;
+      const at = new AccessToken(LK_API_KEY, LK_API_SECRET, {
+        identity: `student-${account.userId}`,
+        name: account.firstName || `Ученик ${account.userId}`,
+      });
+      at.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true });
+      const token = await at.toJwt();
+      return res.json({ token, roomName });
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/admin/video-token", requireAdmin, async (req, res) => {
+    const { bookingId, roomName: rawRoom } = req.body;
+    if (!bookingId && !rawRoom) return res.status(400).json({ message: "bookingId или roomName обязателен" });
+    try {
+      const roomName = rawRoom || `booking-${bookingId}`;
+      const at = new AccessToken(LK_API_KEY, LK_API_SECRET, {
+        identity: "teacher",
+        name: "Преподаватель",
+      });
+      at.addGrant({
+        roomJoin: true,
+        room: roomName,
+        canPublish: true,
+        canSubscribe: true,
+        canUpdateOwnMetadata: true,
+        roomAdmin: true,
+      });
+      const token = await at.toJwt();
+      return res.json({ token, roomName });
     } catch {
       return res.status(500).json({ message: "Ошибка сервера" });
     }

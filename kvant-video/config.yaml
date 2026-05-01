@@ -1,0 +1,15 @@
+port: 9000
+log_level: info
+
+keys:
+  APIE489774A8A86034D: e27ffd8d0268aa8c9f9ef04e2c2e3f7e7b9c69a9f78d2fe979370c073a06f6bb
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: false
+
+room:
+  auto_create: true
+  empty_timeout: 300
+  departure_timeout: 20

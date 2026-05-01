@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Bell, CheckCircle, XCircle, Clock, AlertCircle, Banknote, BanknoteIcon, Plus, CreditCard, Gift } from "lucide-react";
+import { MoreHorizontal, Bell, CheckCircle, XCircle, Clock, AlertCircle, Banknote, BanknoteIcon, Plus, CreditCard, Gift, Video } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -290,6 +290,17 @@ export default function Bookings() {
                           <DropdownMenuItem onClick={() => openPaymentDialog(booking.id, booking.userId, booking.isPaid)}>
                             <BanknoteIcon className="mr-2 h-4 w-4 text-green-500" />
                             {booking.isPaid ? 'Снять оплату' : 'Отметить оплату'}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild>
+                            <a
+                              href={`/video/booking-${booking.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center cursor-pointer"
+                            >
+                              <Video className="mr-2 h-4 w-4 text-teal-600" /> Войти в конференцию
+                            </a>
                           </DropdownMenuItem>
                           {booking.userId && (
                             <>

@@ -26,12 +26,26 @@ const boardWsProxy = createProxyMiddleware({
 });
 app.use(boardProxy);
 app.use(boardWsProxy);
+
+// Proxy to LiveKit server (WebRTC video conferencing)
+const LK_TARGET = process.env.LIVEKIT_INTERNAL_URL || "http://localhost:9000";
+const lkProxy = createProxyMiddleware({
+  pathFilter: (pathname: string) => pathname.startsWith("/lk-ws"),
+  target: LK_TARGET,
+  changeOrigin: true,
+  ws: true,
+  pathRewrite: { "^/lk-ws": "" },
+});
+app.use(lkProxy);
+
 // Forward HTTP UPGRADE (WebSocket handshake) on the underlying http server
 httpServer.on("upgrade", (req, socket, head) => {
   if (req.url && req.url.startsWith("/board-ws")) {
     (boardWsProxy as any).upgrade(req, socket, head);
   } else if (req.url && req.url.startsWith("/board-app")) {
     (boardProxy as any).upgrade(req, socket, head);
+  } else if (req.url && req.url.startsWith("/lk-ws")) {
+    (lkProxy as any).upgrade(req, socket, head);
   }
 });
 

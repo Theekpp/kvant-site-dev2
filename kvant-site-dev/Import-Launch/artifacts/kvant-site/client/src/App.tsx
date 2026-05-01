@@ -10,6 +10,7 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import Cabinet from "@/pages/Cabinet";
 import Board from "@/pages/Board";
+import VideoRoom from "@/pages/VideoRoom";
 import Offer from "@/pages/legal/Offer";
 import Privacy from "@/pages/legal/Privacy";
 import Terms from "@/pages/legal/Terms";
@@ -43,6 +44,13 @@ function Router() {
         {() => (
           <ProtectedRoute>
             <Board />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/video/:roomName">
+        {() => (
+          <ProtectedRoute>
+            <VideoRoom />
           </ProtectedRoute>
         )}
       </Route>

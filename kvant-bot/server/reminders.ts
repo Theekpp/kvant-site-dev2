@@ -9,6 +9,10 @@ function boardLinkFor(roomId: string | null | undefined): string {
   return `${SITE_URL.replace(/\/$/, "")}/board/${roomId}`;
 }
 
+function videoLinkFor(bookingId: number): string {
+  return `${SITE_URL.replace(/\/$/, "")}/video/booking-${bookingId}`;
+}
+
 // Tracks bookings for which we've already sent the 30-min "soon" reminder, to avoid duplicates.
 const soonRemindedIds = new Set<number>();
 
@@ -38,8 +42,9 @@ export function setupReminders(bot: TelegramBot) {
         if (!user || !user.telegramId) continue;
 
         const boardLine = user.boardRoomId
-          ? `\n\u{1F5BC} Онлайн-доска: ${boardLinkFor(user.boardRoomId)}\n`
+          ? `\u{1F5BC} Доска: ${boardLinkFor(user.boardRoomId)}\n`
           : "";
+        const videoLine = `\u{1F4F9} Конференция: ${videoLinkFor(booking.id)}\n`;
 
         try {
           await bot.sendMessage(user.telegramId,
@@ -47,7 +52,8 @@ export function setupReminders(bot: TelegramBot) {
             `Привет, ${user.firstName || "друг"}! Завтра у тебя ${booking.type === "individual" ? "индивидуальное" : "групповое"} занятие по физике.\n\n` +
             `\u{1F4C5} Дата: ${booking.date}\n` +
             `\u{23F0} Время: ${booking.time}\n` +
-            `\u{1F4DA} Длительность: 60 минут\n` +
+            `\u{1F4DA} Длительность: 60 минут\n\n` +
+            videoLine +
             boardLine + "\n" +
             `Не забудь подготовиться! Если нужно перенести \u{2014} напиши Кириллу: @anisimovvd`
           );
@@ -98,15 +104,17 @@ export function setupReminders(bot: TelegramBot) {
         const user = users.find(u => u.id === booking.userId);
         if (!user || !user.telegramId) continue;
 
-        const link = boardLinkFor(user.boardRoomId);
+        const boardLink = boardLinkFor(user.boardRoomId);
+        const videoLink = videoLinkFor(booking.id);
         try {
           await bot.sendMessage(
             user.telegramId,
             `\u{23F0} Занятие через 30 минут!\n\n` +
               `Привет, ${user.firstName || "друг"}! ${booking.type === "individual" ? "Индивидуальное" : "Групповое"} занятие по физике начнётся скоро.\n\n` +
-              `\u{23F0} Время: ${booking.time}\n` +
-              (link ? `\u{1F5BC} Онлайн-доска: ${link}\n\n` : "\n") +
-              `Заходи на доску заранее, чтобы всё успеть подготовить.`,
+              `\u{23F0} Время: ${booking.time}\n\n` +
+              `\u{1F4F9} Конференция: ${videoLink}\n` +
+              (boardLink ? `\u{1F5BC} Доска: ${boardLink}\n\n` : "\n") +
+              `Заходи заранее, чтобы всё успеть подготовить.`,
           );
           soonRemindedIds.add(booking.id);
         } catch (err) {
