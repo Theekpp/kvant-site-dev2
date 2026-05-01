@@ -160,6 +160,9 @@ build = ["bash", "-c", "cd kvant-site-dev/Import-Launch/artifacts/kvant-site && 
 [userenv]
 
 [userenv.shared]
+LIVEKIT_API_KEY = "APIE489774A8A86034D"
+LIVEKIT_API_SECRET = "e27ffd8d0268aa8c9f9ef04e2c2e3f7e7b9c69a9f78d2fe979370c073a06f6bb"
+LIVEKIT_INTERNAL_URL = "http://localhost:9000"
 
 [userenv.development]
 FRONTEND_URL = "https://ea9ca581-63ae-4b94-ae0d-5c52f2d7440e-00-1id0fw0mrzove.riker.replit.dev"
