@@ -266,6 +266,18 @@ export default function Bookings() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 gap-1 text-xs"
+                          asChild
+                        >
+                          <a href={`/video/booking-${booking.id}`} target="_blank" rel="noreferrer">
+                            <Video className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Войти</span>
+                          </a>
+                        </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
@@ -312,6 +324,7 @@ export default function Bookings() {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
