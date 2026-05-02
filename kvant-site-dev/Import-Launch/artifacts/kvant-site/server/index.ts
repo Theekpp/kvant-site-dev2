@@ -13,30 +13,27 @@ const httpServer = createServer(app);
 const BOARD_TARGET =
   process.env.BOARD_INTERNAL_URL || "http://localhost:8000";
 const boardProxy = createProxyMiddleware({
-  pathFilter: (pathname: string) => pathname.startsWith("/board-app"),
   target: BOARD_TARGET,
   changeOrigin: true,
   ws: true,
 });
 const boardWsProxy = createProxyMiddleware({
-  pathFilter: (pathname: string) => pathname.startsWith("/board-ws"),
   target: BOARD_TARGET,
   changeOrigin: true,
   ws: true,
 });
-app.use(boardProxy);
-app.use(boardWsProxy);
+app.use("/board-app", boardProxy);
+app.use("/board-ws", boardWsProxy);
 
 // Proxy to LiveKit server (WebRTC video conferencing)
 const LK_TARGET = process.env.LIVEKIT_INTERNAL_URL || "http://localhost:9000";
 const lkProxy = createProxyMiddleware({
-  pathFilter: (pathname: string) => pathname.startsWith("/lk-ws"),
   target: LK_TARGET,
   changeOrigin: true,
   ws: true,
   pathRewrite: { "^/lk-ws": "" },
 });
-app.use(lkProxy);
+app.use("/lk-ws", lkProxy);
 
 // Forward HTTP UPGRADE (WebSocket handshake) on the underlying http server
 httpServer.on("upgrade", (req, socket, head) => {
