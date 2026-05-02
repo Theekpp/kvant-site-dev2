@@ -13,6 +13,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     if (location.startsWith("/admin/students")) return "База учеников";
     if (location.startsWith("/admin/subscriptions")) return "Абонементы";
     if (location.startsWith("/admin/payments")) return "Оплаты";
+    if (location.startsWith("/admin/recordings")) return "Записи конференций";
     return "Управление";
   };
 

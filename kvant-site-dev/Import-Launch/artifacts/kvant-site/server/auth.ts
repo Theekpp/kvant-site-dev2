@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import {
-  accounts, refreshTokens, emailTokens, users, bookings, subscriptions, scheduleSlots,
+  accounts, refreshTokens, emailTokens, users, bookings, subscriptions, scheduleSlots, recordings,
 } from "@shared/schema";
 import { eq, and, gt, desc, asc } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -10,7 +10,7 @@ import { Resend } from "resend";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import crypto from "crypto";
-import { AccessToken } from "livekit-server-sdk";
+import { AccessToken, EgressClient } from "livekit-server-sdk";
 
 const LK_API_KEY = process.env.LIVEKIT_API_KEY || "APIE489774A8A86034D";
 const LK_API_SECRET = process.env.LIVEKIT_API_SECRET || "e27ffd8d0268aa8c9f9ef04e2c2e3f7e7b9c69a9f78d2fe979370c073a06f6bb";
@@ -730,5 +730,79 @@ export function registerAuthRoutes(app: Express) {
     } catch {
       return res.status(500).json({ message: "Ошибка сервера" });
     }
+  });
+
+  // ── Recording (LiveKit Egress) ──────────────────────────────────────────────
+
+  function getEgressClient(): EgressClient | null {
+    const host = process.env.LIVEKIT_HOST;
+    if (!host) return null;
+    return new EgressClient(host, LK_API_KEY, LK_API_SECRET);
+  }
+
+  app.post("/api/admin/recording/start", requireAuth, requireAdmin, async (req, res) => {
+    const { roomName, bookingId } = req.body;
+    if (!roomName) return res.status(400).json({ message: "roomName обязателен" });
+    const client = getEgressClient();
+    if (!client) return res.status(503).json({ message: "Сервер записи не настроен. Добавьте LIVEKIT_HOST в переменные окружения." });
+    try {
+      const existing = await db.select().from(recordings)
+        .where(and(eq(recordings.roomName, roomName), eq(recordings.status, "recording")));
+      if (existing.length > 0) return res.status(409).json({ message: "Запись уже идёт", egressId: existing[0].egressId, id: existing[0].id });
+
+      const filename = `${roomName}_${Date.now()}.mp4`;
+      const info = await client.startRoomCompositeEgress(roomName, {
+        file: { filepath: `/recordings/${filename}` },
+      }, { layout: "speaker-dark" });
+
+      const [rec] = await db.insert(recordings).values({
+        egressId: info.egressId,
+        roomName,
+        bookingId: bookingId ? Number(bookingId) : null,
+        filename,
+        status: "recording",
+      }).returning();
+      return res.json({ egressId: info.egressId, id: rec.id });
+    } catch (err: any) {
+      return res.status(500).json({ message: err?.message || "Ошибка запуска записи" });
+    }
+  });
+
+  app.post("/api/admin/recording/stop", requireAuth, requireAdmin, async (req, res) => {
+    const { egressId } = req.body;
+    if (!egressId) return res.status(400).json({ message: "egressId обязателен" });
+    const client = getEgressClient();
+    if (!client) return res.status(503).json({ message: "Сервер записи не настроен" });
+    try {
+      await client.stopEgress(egressId);
+      const [rec] = await db.select().from(recordings).where(eq(recordings.egressId, egressId));
+      if (rec) {
+        const durationSec = rec.startedAt ? Math.round((Date.now() - new Date(rec.startedAt).getTime()) / 1000) : null;
+        const baseUrl = process.env.RECORDINGS_BASE_URL || "";
+        const fileUrl = baseUrl && rec.filename ? `${baseUrl}/${rec.filename}` : null;
+        await db.update(recordings)
+          .set({ status: "completed", endedAt: new Date(), durationSeconds: durationSec, fileUrl })
+          .where(eq(recordings.egressId, egressId));
+      }
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err?.message || "Ошибка остановки записи" });
+    }
+  });
+
+  app.get("/api/admin/recording/active/:roomName", requireAuth, requireAdmin, async (req, res) => {
+    const [active] = await db.select().from(recordings)
+      .where(and(eq(recordings.roomName, req.params.roomName), eq(recordings.status, "recording")));
+    return res.json({ active: active || null });
+  });
+
+  app.get("/api/admin/recordings", requireAuth, requireAdmin, async (req, res) => {
+    const list = await db.select().from(recordings).orderBy(desc(recordings.startedAt));
+    return res.json(list);
+  });
+
+  app.delete("/api/admin/recordings/:id", requireAuth, requireAdmin, async (req, res) => {
+    await db.delete(recordings).where(eq(recordings.id, Number(req.params.id)));
+    return res.json({ ok: true });
   });
 }

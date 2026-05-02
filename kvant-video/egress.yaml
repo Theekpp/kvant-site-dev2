@@ -1,0 +1,27 @@
+# LiveKit Egress configuration
+# Docs: https://docs.livekit.io/egress/overview/
+
+api_key: APIE489774A8A86034D
+api_secret: e27ffd8d0268aa8c9f9ef04e2c2e3f7e7b9c69a9f78d2fe979370c073a06f6bb
+
+# LiveKit server address (internal Docker network)
+ws_url: ws://livekit:7880
+
+redis:
+  address: redis:6379
+
+# Health check port
+health_port: 9091
+
+# Prometheus metrics port
+prometheus_port: 9092
+
+logging:
+  level: info
+
+# CPU limit per egress job (helps on small VPS)
+# For 2 vCPU server: 1.5 is safe for 1 concurrent recording
+cpu_cost:
+  room_composite_cpu_cost: 2.5
+  track_composite_cpu_cost: 1.0
+  track_cpu_cost: 0.5

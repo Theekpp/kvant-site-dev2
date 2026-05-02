@@ -8,7 +8,8 @@ import {
   GraduationCap,
   Banknote,
   Star,
-  History
+  History,
+  Video
 } from "lucide-react";
 import {
   Sidebar,
@@ -31,6 +32,7 @@ const navItems = [
   { title: "Оплаты",      url: "/admin/payments",      icon: Banknote },
   { title: "Отзывы",      url: "/admin/reviews",       icon: Star },
   { title: "История",     url: "/admin/history",       icon: History },
+  { title: "Видеозаписи", url: "/admin/recordings",    icon: Video },
 ];
 
 export function AppSidebar() {

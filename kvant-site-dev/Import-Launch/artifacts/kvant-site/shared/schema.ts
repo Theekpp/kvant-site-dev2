@@ -119,6 +119,19 @@ export const refunds = pgTable("refunds", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+export const recordings = pgTable("recordings", {
+  id: serial("id").primaryKey(),
+  egressId: text("egress_id").unique(),
+  roomName: text("room_name").notNull(),
+  bookingId: integer("booking_id").references(() => bookings.id),
+  status: text("status").notNull().default("recording"),
+  startedAt: timestamp("started_at").notNull().default(sql`now()`),
+  endedAt: timestamp("ended_at"),
+  filename: text("filename"),
+  fileUrl: text("file_url"),
+  durationSeconds: integer("duration_seconds"),
+});
+
 export const adminActions = pgTable("admin_actions", {
   id: serial("id").primaryKey(),
   action: text("action").notNull(),
@@ -146,3 +159,4 @@ export type Payment = typeof payments.$inferSelect;
 export type Refund = typeof refunds.$inferSelect;
 export type AdminAction = typeof adminActions.$inferSelect;
 export type BotActivity = typeof botActivity.$inferSelect;
+export type Recording = typeof recordings.$inferSelect;
