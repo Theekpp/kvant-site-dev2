@@ -10,9 +10,63 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { tryRefreshToken, getAccessToken, getMe } from "@/lib/auth";
 
 // Asset imports
-import heroImage from "@assets/image_1771362600078.png";
 import aboutImage from "@assets/image_1771364502291.png";
 import kvantLogo from "@assets/image_1775753659602.png";
+
+const JSON_LD_SCHEMA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "#tutor",
+      "name": "Кирилл",
+      "jobTitle": "Репетитор по физике",
+      "description": "Опытный репетитор по физике. Помогает ученикам подготовиться к ЕГЭ, ОГЭ и олимпиадам по физике с индивидуальным подходом.",
+      "knowsAbout": ["Физика", "ЕГЭ физика", "ОГЭ физика", "Олимпиадная физика", "Механика", "Электродинамика", "Термодинамика"],
+      "url": typeof window !== "undefined" ? window.location.origin : "",
+    },
+    {
+      "@type": "EducationalOrganization",
+      "@id": "#org",
+      "name": "Физика с Кириллом",
+      "description": "Онлайн-репетиторство по физике. Индивидуальные занятия, подготовка к ЕГЭ и ОГЭ, работа с интерактивной доской и видеосвязью.",
+      "url": typeof window !== "undefined" ? window.location.origin : "",
+      "sameAs": [],
+      "founder": { "@id": "#tutor" },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Занятия по физике",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Course",
+              "name": "Абонемент на 4 занятия",
+              "description": "Индивидуальные онлайн-занятия по физике, 4 урока"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Course",
+              "name": "Абонемент на 8 занятий",
+              "description": "Индивидуальные онлайн-занятия по физике, 8 уроков"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "#website",
+      "name": "Физика с Кириллом",
+      "url": typeof window !== "undefined" ? window.location.origin : "",
+      "description": "Онлайн-репетитор по физике. Подготовка к ЕГЭ, ОГЭ и олимпиадам.",
+      "publisher": { "@id": "#org" },
+      "inLanguage": "ru-RU"
+    }
+  ]
+};
 
 export default function HomeBlueAccent() {
   const [activeTab, setActiveTab] = useState("newton");
@@ -60,6 +114,11 @@ export default function HomeBlueAccent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/30">
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_SCHEMA) }}
+      />
       {/* Formulas Background Effect - Academic/Educational */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         {/* Physics Formulas Floating */}
@@ -94,8 +153,9 @@ export default function HomeBlueAccent() {
           <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
             <img
               src={kvantLogo}
-              alt="K"
+              alt="Физика с Кириллом — логотип"
               className="object-contain"
+              loading="eager"
               style={{ width: 'clamp(40px, calc(1.5vw + 28px), 56px)', height: 'clamp(40px, calc(1.5vw + 28px), 56px)' }}
             />
             <span
@@ -505,8 +565,10 @@ export default function HomeBlueAccent() {
                 <div className="relative rounded-3xl overflow-hidden aspect-auto max-h-[80vh] shadow-xl ring-1 ring-slate-200 bg-white">
                   <img 
                     src={aboutImage} 
-                    alt="Кирилл Анисимов" 
+                    alt="Кирилл Анисимов — репетитор по физике" 
                     className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="absolute bottom-0 left-0 w-full p-4 sm:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
                     <h3 className="text-lg sm:text-2xl font-bold text-white mb-1">Кирилл Анисимов</h3>
@@ -742,7 +804,7 @@ export default function HomeBlueAccent() {
           <div className="mt-20 pt-10 border-t border-slate-800 text-sm text-slate-400 space-y-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
-                <img src={kvantLogo} alt="K" className="w-6 h-6 object-contain opacity-80" />
+                <img src={kvantLogo} alt="Физика с Кириллом" className="w-6 h-6 object-contain opacity-80" loading="lazy" />
                 <span className="font-display font-bold text-slate-200">vant</span>
               </div>
               <div>© {new Date().getFullYear()} Kvant. Все права защищены.</div>

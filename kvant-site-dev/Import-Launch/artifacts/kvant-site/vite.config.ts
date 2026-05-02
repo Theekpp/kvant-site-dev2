@@ -77,6 +77,57 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     target: ["chrome87", "firefox78", "safari14", "edge88"],
+    cssMinify: "lightningcss",
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Core React runtime — always needed
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+          // UI library components (heavy, rarely change)
+          if (id.includes("node_modules/@radix-ui/")) {
+            return "vendor-radix";
+          }
+          // Animation library
+          if (id.includes("node_modules/framer-motion/")) {
+            return "vendor-framer";
+          }
+          // LiveKit (very heavy, only needed on /video route)
+          if (
+            id.includes("node_modules/livekit-client/") ||
+            id.includes("node_modules/@livekit/")
+          ) {
+            return "vendor-livekit";
+          }
+          // Charts (only admin)
+          if (id.includes("node_modules/recharts/")) {
+            return "vendor-recharts";
+          }
+          // Date/form utilities
+          if (
+            id.includes("node_modules/date-fns/") ||
+            id.includes("node_modules/react-day-picker/") ||
+            id.includes("node_modules/react-hook-form/") ||
+            id.includes("node_modules/@hookform/")
+          ) {
+            return "vendor-forms";
+          }
+          // Routing + query
+          if (
+            id.includes("node_modules/wouter/") ||
+            id.includes("node_modules/@tanstack/")
+          ) {
+            return "vendor-routing";
+          }
+          // Everything else from node_modules → generic vendor chunk
+          if (id.includes("node_modules/")) {
+            return "vendor-misc";
+          }
+        },
+      },
+    },
   },
   server: {
     host: "0.0.0.0",

@@ -1,5 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
+import compression from "compression";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -8,7 +11,69 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
-// Proxy to kvant-board service (Excalidraw collaboration board)
+// Trust Replit's reverse proxy (needed for express-rate-limit to get real client IP)
+app.set("trust proxy", 1);
+
+// ── Security headers ────────────────────────────────────────────────────────
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: [
+          "'self'",
+          "wss:",
+          "ws:",
+          "https:",
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+        ],
+        mediaSrc: ["'self'", "blob:", "https:"],
+        frameSrc: ["'self'"],
+        workerSrc: ["'self'", "blob:"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+  }),
+);
+
+// ── Gzip/Brotli compression ──────────────────────────────────────────────────
+app.use(
+  compression({
+    level: 6,
+    threshold: 1024,
+    filter: (req, res) => {
+      if (req.headers["x-no-compression"]) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
+
+// ── Global rate limiting ─────────────────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Слишком много запросов, попробуйте позже." },
+  skip: (req) => req.path.startsWith("/board-app") || req.path.startsWith("/lk-ws"),
+});
+app.use(globalLimiter);
+
+// ── Proxy to kvant-board service (Excalidraw collaboration board) ────────────
 // Mounted BEFORE body parsers so request bodies are streamed unmodified.
 const BOARD_TARGET =
   process.env.BOARD_INTERNAL_URL || "http://localhost:8000";
@@ -25,7 +90,7 @@ const boardWsProxy = createProxyMiddleware({
 app.use("/board-app", boardProxy);
 app.use("/board-ws", boardWsProxy);
 
-// Proxy to LiveKit server (WebRTC video conferencing)
+// ── Proxy to LiveKit server (WebRTC video conferencing) ──────────────────────
 const LK_TARGET = process.env.LIVEKIT_INTERNAL_URL || "http://localhost:9000";
 const lkProxy = createProxyMiddleware({
   target: LK_TARGET,
@@ -35,7 +100,7 @@ const lkProxy = createProxyMiddleware({
 });
 app.use("/lk-ws", lkProxy);
 
-// Forward HTTP UPGRADE (WebSocket handshake) on the underlying http server
+// ── Forward HTTP UPGRADE (WebSocket handshake) ───────────────────────────────
 httpServer.on("upgrade", (req, socket, head) => {
   if (req.url && req.url.startsWith("/board-ws")) {
     (boardWsProxy as any).upgrade(req, socket, head);

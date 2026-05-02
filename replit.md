@@ -129,3 +129,24 @@ Shared booking calendar logic was extracted to reduce duplication and improve ma
 - **Consent checkbox** on `/register` page (required, validated via zod)
 - **Consent checkbox** in PricingCards cart bar (required before adding plans or proceeding to checkout)
 - **Footer** — includes реквизиты (`[ФИО] · ИНН [ИНН] · Самозанятый`) and links to all 4 legal pages
+
+## Performance & Security (Audit Hardening — May 2026)
+
+### Server-side
+- **Helmet** — full security headers: CSP, HSTS (1yr), X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- **Compression (gzip)** — Express `compression` middleware, threshold 1KB, level 6
+- **Global rate limiting** — 300 req/min per IP (proxy-aware, `trust proxy: 1`); auth routes have stricter 10 req/15min limit
+- **Static asset caching** — hashed `/assets/*` served with `Cache-Control: immutable, max-age=1y`; HTML served with `no-cache`
+- **Dynamic sitemap.xml** — Express endpoint at `/sitemap.xml`, auto-uses request host; includes all public pages
+- **Dynamic robots.txt** — Express endpoint at `/robots.txt`, auto-injects correct sitemap URL
+
+### Frontend SEO
+- **`<title>` tag** — added to `index.html`, with per-page dynamic updates via `TitleManager` component in `App.tsx`
+- **`<meta name="description">`** — descriptive 150-char description added
+- **Canonical URL** — `<link rel="canonical">` updated at build time by `vite-plugin-meta-images.ts`
+- **OG/Twitter tags** — og:url, og:locale, og:site_name, og:image:alt, og:image dimensions added; twitter:site removed (was @replit)
+- **JSON-LD structured data** — `Person`, `EducationalOrganization`, `WebSite` schemas injected in `HomeBlueAccent.tsx`
+- **Image alt texts** — all images now have descriptive alt text
+- **`loading="lazy"` / `loading="eager"`** — set appropriately on all images; unused `heroImage` import removed
+- **Vite build chunks** — manual chunk splitting: react, radix-ui, framer-motion, livekit, recharts, forms, routing separated
+- **Viewport** — removed `maximum-scale=1` (was breaking mobile accessibility)

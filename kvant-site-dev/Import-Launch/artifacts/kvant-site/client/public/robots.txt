@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /cabinet/
+Disallow: /board/
+Disallow: /video/
+
+Sitemap: https://replit.com/sitemap.xml

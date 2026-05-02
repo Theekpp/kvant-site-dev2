@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,6 +20,36 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import AdminApp from "@/pages/admin/AdminApp";
 import CookieBanner from "@/components/CookieBanner";
+
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Физика с Кириллом — репетитор по физике онлайн",
+  "/login": "Вход — Физика с Кириллом",
+  "/register": "Регистрация — Физика с Кириллом",
+  "/verify-email": "Подтверждение email — Физика с Кириллом",
+  "/forgot-password": "Восстановление пароля — Физика с Кириллом",
+  "/reset-password": "Новый пароль — Физика с Кириллом",
+  "/cabinet": "Личный кабинет — Физика с Кириллом",
+  "/offer": "Договор оферты — Физика с Кириллом",
+  "/privacy": "Политика конфиденциальности — Физика с Кириллом",
+  "/terms": "Условия использования — Физика с Кириллом",
+  "/refund": "Политика возврата — Физика с Кириллом",
+};
+
+function TitleManager() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    const title = PAGE_TITLES[location] ?? "Физика с Кириллом — репетитор по физике онлайн";
+    document.title = title;
+
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", title);
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twitterTitle) twitterTitle.setAttribute("content", title);
+  }, [location]);
+
+  return null;
+}
 
 function Router() {
   return (
@@ -75,6 +106,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <TitleManager />
       <Toaster />
       <Router />
       <CookieBanner />

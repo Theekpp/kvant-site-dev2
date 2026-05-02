@@ -3,8 +3,8 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * Vite plugin that updates og:image and twitter:image meta tags
- * to point to the app's opengraph image with the correct Replit domain.
+ * Vite plugin that updates og:image, twitter:image, og:url, and canonical
+ * meta tags to point to the app's correct Replit domain at build time.
  */
 export function metaImagesPlugin(): Plugin {
   return {
@@ -15,6 +15,19 @@ export function metaImagesPlugin(): Plugin {
         log('[meta-images] no Replit deployment domain found, skipping meta tag updates');
         return html;
       }
+
+      // Update canonical and og:url with the real deployment URL
+      html = html.replace(
+        /<link\s+rel="canonical"\s+href="[^"]*"\s*\/>/g,
+        `<link rel="canonical" href="${baseUrl}" />`
+      );
+      html = html.replace(
+        /<meta\s+property="og:url"\s+content="[^"]*"\s*\/>/g,
+        `<meta property="og:url" content="${baseUrl}" />`
+      );
+
+      // Update robots.txt sitemap URL
+      // (robots.txt is a static file; domain update done server-side)
 
       // Check if opengraph image exists in public directory
       const publicDir = path.resolve(process.cwd(), 'client', 'public');
@@ -31,24 +44,21 @@ export function metaImagesPlugin(): Plugin {
         imageExt = 'jpeg';
       }
 
-      if (!imageExt) {
-        log('[meta-images] OpenGraph image not found, skipping meta tag updates');
-        return html;
+      if (imageExt) {
+        const imageUrl = `${baseUrl}/opengraph.${imageExt}`;
+        log('[meta-images] updating meta image tags to:', imageUrl);
+
+        html = html.replace(
+          /<meta\s+property="og:image"\s+content="[^"]*"\s*\/>/g,
+          `<meta property="og:image" content="${imageUrl}" />`
+        );
+        html = html.replace(
+          /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/>/g,
+          `<meta name="twitter:image" content="${imageUrl}" />`
+        );
+      } else {
+        log('[meta-images] OpenGraph image not found, skipping image meta tag updates');
       }
-
-      const imageUrl = `${baseUrl}/opengraph.${imageExt}`;
-
-      log('[meta-images] updating meta image tags to:', imageUrl);
-
-      html = html.replace(
-        /<meta\s+property="og:image"\s+content="[^"]*"\s*\/>/g,
-        `<meta property="og:image" content="${imageUrl}" />`
-      );
-
-      html = html.replace(
-        /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/>/g,
-        `<meta name="twitter:image" content="${imageUrl}" />`
-      );
 
       return html;
     },
