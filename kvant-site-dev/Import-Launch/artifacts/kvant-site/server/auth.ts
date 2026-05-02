@@ -3,7 +3,7 @@ import { db } from "./db";
 import {
   accounts, refreshTokens, emailTokens, users, bookings, subscriptions, scheduleSlots, recordings, studentProfiles,
 } from "@shared/schema";
-import { eq, and, gt, desc, asc } from "drizzle-orm";
+import { eq, and, gt, desc, asc, ne } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Resend } from "resend";
@@ -838,10 +838,16 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Токен истёк. Сгенерируйте новый в личном кабинете" });
       }
       if (account.userId) {
+        // Remove this telegramId from any other user first (bot may have auto-created one on /start)
+        await db.update(users)
+          .set({ telegramId: null, telegramUsername: null })
+          .where(and(eq(users.telegramId, telegramId), ne(users.id, account.userId)));
+        // Now safely set on the target user
         await db.update(users)
           .set({ telegramId, telegramUsername: telegramUsername || null })
           .where(eq(users.id, account.userId));
       } else {
+        // Find if a bot-created user with this telegramId already exists
         const existing = await db.select().from(users).where(eq(users.telegramId, telegramId));
         let userId: number;
         if (existing.length > 0) {
