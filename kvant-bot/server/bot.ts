@@ -47,8 +47,8 @@ const SITE_INTERNAL_URL = process.env.SITE_INTERNAL_URL || "http://localhost:500
 const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "📝 Записаться на занятие" }, { text: "💰 Услуги и оплата" }],
-    [{ text: "📋 Мои записи" }],
-    [{ text: "🌐 Личный кабинет", web_app: { url: `${SITE_URL}/cabinet` } }],
+    [{ text: "📋 Мои записи" }, { text: "📚 История занятий" }],
+    [{ text: "📄 Личное дело" }, { text: "🌐 Личный кабинет", web_app: { url: `${SITE_URL}/cabinet` } }],
     [{ text: "ℹ️ О менторе" }, { text: "📞 Контакты" }],
     [{ text: "❓ Задать вопрос" }, { text: "📖 Формат занятий" }],
   ],
@@ -405,6 +405,8 @@ export function startBot() {
   const MAIN_MENU_COMMANDS = new Set([
     "📝 Записаться на занятие",
     "📋 Мои записи",
+    "📚 История занятий",
+    "📄 Личное дело",
     "ℹ️ О менторе",
     "📞 Контакты",
     "❓ Задать вопрос",
@@ -462,6 +464,14 @@ export function startBot() {
     }
     if (text === "💰 Услуги и оплата") {
       await sendServicesMenu(bot, chatId);
+      return;
+    }
+    if (text === "📚 История занятий") {
+      await sendLessonHistory(bot, chatId);
+      return;
+    }
+    if (text === "📄 Личное дело") {
+      await sendStudentFile(bot, chatId);
       return;
     }
 
@@ -676,6 +686,8 @@ export function startBot() {
 
     if (data === "buy_sub4" || data === "buy_sub8") {
       const count = data === "buy_sub4" ? 4 : 8;
+      const price = data === "buy_sub4" ? 5700 : 10800;
+
       let user = await storage.getUserByTelegramId(chatId);
       if (!user) {
         user = await storage.createUser({
@@ -694,25 +706,109 @@ export function startBot() {
         isPaid: false,
       });
 
-      await bot.sendMessage(chatId,
-        `💳 Абонемент на ${count} занятий оформлен!\n\n` +
-        `Для оплаты свяжитесь с Кириллом:\n` +
-        `💬 Telegram: @anisimovvd\n` +
-        `📱 Телефон: +7 (964) 882-36-78\n\n` +
-        `После подтверждения оплаты абонемент будет активирован.\n\n` +
-        `ℹ️ Номер абонемента: #${sub.id}`,
-        { reply_markup: MAIN_KEYBOARD }
+      const payment = await createYookassaPayment(
+        sub.id,
+        price,
+        `Абонемент на ${count} занятий по физике`,
+        `${SITE_URL}/cabinet`
       );
+
+      if (payment) {
+        await bot.sendMessage(chatId,
+          `💳 Абонемент на ${count} занятий — ${price.toLocaleString("ru-RU")} ₽\n\n` +
+          `Нажмите кнопку ниже для оплаты. После подтверждения абонемент будет активирован автоматически.\n\n` +
+          `ℹ️ Номер абонемента: #${sub.id}`,
+          {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: "💳 Оплатить", url: payment.confirmationUrl },
+              ]],
+            },
+          }
+        );
+      } else {
+        await bot.sendMessage(chatId,
+          `💳 Абонемент на ${count} занятий оформлен!\n\n` +
+          `Для оплаты свяжитесь с Кириллом:\n` +
+          `💬 Telegram: @anisimovvd\n` +
+          `📱 Телефон: +7 (964) 882-36-78\n\n` +
+          `После подтверждения оплаты абонемент будет активирован.\n\n` +
+          `ℹ️ Номер абонемента: #${sub.id}`,
+          { reply_markup: MAIN_KEYBOARD }
+        );
+      }
 
       if (adminChatId) {
         const name = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Без имени";
         await bot.sendMessage(parseInt(adminChatId),
           `💳 Новый абонемент!\n\n` +
           `👤 ${name} (@${user.telegramUsername || "нет username"})\n` +
-          `📚 Абонемент на ${count} занятий\n` +
+          `📚 Абонемент на ${count} занятий — ${price.toLocaleString("ru-RU")} ₽\n` +
           `ℹ️ ID: #${sub.id}\n\n` +
-          `Ожидает оплаты. Подтвердите в панели управления.`
+          (payment ? "Ожидает оплаты через ЮКасса." : "Ожидает оплаты. Подтвердите в панели управления.")
         );
+      }
+      return;
+    }
+
+    if (data.startsWith("confirm_booking_") || data.startsWith("reject_booking_")) {
+      const isConfirm = data.startsWith("confirm_booking_");
+      const bookingId = parseInt(data.replace(isConfirm ? "confirm_booking_" : "reject_booking_", ""));
+      if (isNaN(bookingId)) return;
+
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        await bot.sendMessage(chatId, "❌ Запись не найдена.");
+        return;
+      }
+
+      if (booking.status !== "pending") {
+        const statusText = booking.status === "confirmed" ? "уже подтверждена" :
+                           booking.status === "cancelled" ? "уже отменена" : `статус: ${booking.status}`;
+        try {
+          await bot.editMessageReplyMarkup(
+            { inline_keyboard: [] },
+            { chat_id: chatId, message_id: query.message?.message_id }
+          );
+        } catch {}
+        await bot.sendMessage(chatId, `⚠️ Запись #${bookingId} ${statusText}.`);
+        return;
+      }
+
+      const newStatus = isConfirm ? "confirmed" : "cancelled";
+      await storage.updateBookingStatus(bookingId, newStatus);
+
+      const statusEmoji = isConfirm ? "✅" : "❌";
+      const statusWord = isConfirm ? "Подтверждено" : "Отклонено";
+      const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
+
+      try {
+        const origText = query.message?.text || "";
+        await bot.editMessageText(
+          `${statusEmoji} ${statusWord}\n\n${origText}`,
+          { chat_id: chatId, message_id: query.message?.message_id }
+        );
+      } catch {}
+
+      const student = await storage.getUser(booking.userId);
+      if (student?.telegramId) {
+        if (isConfirm) {
+          await bot.sendMessage(
+            student.telegramId,
+            `✅ Запись подтверждена!\n\n` +
+            `📚 ${typeText.charAt(0).toUpperCase() + typeText.slice(1)} занятие\n` +
+            `📅 ${booking.date} в ${booking.time}\n\n` +
+            `До встречи! 🎓`
+          );
+        } else {
+          await bot.sendMessage(
+            student.telegramId,
+            `❌ Ваша запись отменена.\n\n` +
+            `📚 ${typeText.charAt(0).toUpperCase() + typeText.slice(1)} занятие\n` +
+            `📅 ${booking.date} в ${booking.time}\n\n` +
+            `Если есть вопросы — напишите Кириллу: @anisimovvd`
+          );
+        }
       }
       return;
     }
@@ -1226,14 +1322,21 @@ async function finalizeBooking(bot: TelegramBot, chatId: number, data: Record<st
 
   if (adminChatId) {
     const name = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Без имени";
-    await bot.sendMessage(parseInt(adminChatId),
+    const adminText =
       `📝 Новая запись!\n\n` +
       `👤 ${name} (@${user.telegramUsername || "нет username"})\n` +
       `📱 ${user.phone || "телефон не указан"}\n` +
       `📚 ${typeText} занятие\n` +
       `📅 ${bookingDate} в ${data.time}\n` +
-      `🆔 Запись #${booking.id}`
-    );
+      `🆔 Запись #${booking.id}`;
+    await bot.sendMessage(parseInt(adminChatId), adminText, {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "✅ Подтвердить", callback_data: `confirm_booking_${booking.id}` },
+          { text: "❌ Отклонить", callback_data: `reject_booking_${booking.id}` },
+        ]],
+      },
+    });
   }
 }
 
@@ -1346,6 +1449,139 @@ async function sendFormatInfo(bot: TelegramBot, chatId: number) {
       },
     }
   );
+}
+
+async function createYookassaPayment(
+  subscriptionId: number,
+  amount: number,
+  description: string,
+  returnUrl: string
+): Promise<{ id: string; confirmationUrl: string } | null> {
+  const shopId = process.env.YOOKASSA_SHOP_ID;
+  const secretKey = process.env.YOOKASSA_SECRET_KEY;
+  if (!shopId || !secretKey) return null;
+  try {
+    const { randomUUID } = await import("crypto");
+    const resp = await fetch("https://api.yookassa.ru/v3/payments", {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${Buffer.from(`${shopId}:${secretKey}`).toString("base64")}`,
+        "Content-Type": "application/json",
+        "Idempotence-Key": randomUUID(),
+      },
+      body: JSON.stringify({
+        amount: { value: amount.toFixed(2), currency: "RUB" },
+        capture: true,
+        confirmation: { type: "redirect", return_url: returnUrl },
+        description,
+        metadata: { subscriptionId: String(subscriptionId) },
+      }),
+    });
+    if (!resp.ok) {
+      console.error("YooKassa payment creation failed:", resp.status, await resp.text());
+      return null;
+    }
+    const data = await resp.json() as any;
+    return { id: data.id, confirmationUrl: data.confirmation?.confirmation_url };
+  } catch (err) {
+    console.error("YooKassa payment error:", err);
+    return null;
+  }
+}
+
+async function sendLessonHistory(bot: TelegramBot, chatId: number) {
+  const user = await storage.getUserByTelegramId(chatId);
+  if (!user) {
+    await bot.sendMessage(chatId,
+      "У тебя пока нет истории занятий. Запишись на занятие через главное меню!",
+      { reply_markup: MAIN_KEYBOARD }
+    );
+    return;
+  }
+
+  const allBookings = await storage.getBookingsByUserId(user.id);
+  if (allBookings.length === 0) {
+    await bot.sendMessage(chatId, "📚 История занятий пока пуста.", { reply_markup: MAIN_KEYBOARD });
+    return;
+  }
+
+  const sorted = [...allBookings].sort((a, b) => {
+    const [ad, am, ay] = a.date.split(".").map(Number);
+    const [bd, bm, by] = b.date.split(".").map(Number);
+    return new Date(by, bm - 1, bd).getTime() - new Date(ay, am - 1, ad).getTime();
+  });
+
+  const statusEmoji: Record<string, string> = {
+    confirmed: "✅",
+    pending: "⏳",
+    cancelled: "❌",
+    completed: "🎓",
+  };
+
+  const upcoming = sorted.filter(b => b.status === "confirmed" || b.status === "pending");
+  const past = sorted.filter(b => b.status === "completed" || b.status === "cancelled");
+
+  let msg = `📚 История занятий\n`;
+
+  if (upcoming.length > 0) {
+    msg += `\n🗓 Предстоящие:\n`;
+    for (const b of upcoming) {
+      const typeText = b.type === "individual" ? "Инд." : "Груп.";
+      const emoji = statusEmoji[b.status] || "•";
+      msg += `${emoji} ${b.date} в ${b.time} — ${typeText}\n`;
+    }
+  }
+
+  if (past.length > 0) {
+    msg += `\n📂 Прошедшие:\n`;
+    const shown = past.slice(0, 10);
+    for (const b of shown) {
+      const typeText = b.type === "individual" ? "Инд." : "Груп.";
+      const emoji = statusEmoji[b.status] || "•";
+      msg += `${emoji} ${b.date} в ${b.time} — ${typeText}\n`;
+    }
+    if (past.length > 10) msg += `...и ещё ${past.length - 10}\n`;
+  }
+
+  await bot.sendMessage(chatId, msg, { reply_markup: MAIN_KEYBOARD });
+}
+
+async function sendStudentFile(bot: TelegramBot, chatId: number) {
+  const user = await storage.getUserByTelegramId(chatId);
+  if (!user) {
+    await bot.sendMessage(chatId,
+      "Профиль не найден. Запишитесь на занятие, чтобы появилось личное дело.",
+      { reply_markup: MAIN_KEYBOARD }
+    );
+    return;
+  }
+
+  const profile = await storage.getStudentProfile(user.id);
+
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Без имени";
+  let msg = `📄 Личное дело\n\n👤 ${fullName}\n`;
+  if (user.grade) msg += `🎓 Класс/статус: ${user.grade}\n`;
+  if (user.goal) msg += `🎯 Цель: ${user.goal}\n`;
+  if (user.phone) msg += `📱 Телефон: ${user.phone}\n`;
+  msg += "\n";
+
+  if (!profile || (!profile.roadmap && !profile.homework && !profile.materials && !profile.lessonNotes && !profile.tutorNotes)) {
+    msg +=
+      "📝 Личное дело пока не заполнено репетитором.\n\n" +
+      "После нескольких занятий Кирилл добавит сюда:\n" +
+      "• Дорожную карту обучения\n" +
+      "• Домашние задания\n" +
+      "• Материалы и ссылки\n" +
+      "• Конспекты уроков";
+  } else {
+    if (profile.roadmap) msg += `🗺 Дорожная карта:\n${profile.roadmap}\n\n`;
+    if (profile.homework) msg += `📝 Домашнее задание:\n${profile.homework}\n\n`;
+    if (profile.materials) msg += `📚 Материалы:\n${profile.materials}\n\n`;
+    if (profile.lessonNotes) msg += `📖 Конспект:\n${profile.lessonNotes}\n\n`;
+    if (profile.tutorNotes) msg += `💬 Заметки репетитора:\n${profile.tutorNotes}\n\n`;
+  }
+
+  await bot.sendMessage(chatId, msg.trim(), { reply_markup: MAIN_KEYBOARD });
 }
 
 async function sendServiceInfo(bot: TelegramBot, chatId: number, service: string) {

@@ -1,9 +1,10 @@
 import {
-  users, bookings, scheduleSlots, subscriptions,
+  users, bookings, scheduleSlots, subscriptions, studentProfiles,
   type User, type InsertUser,
   type Booking, type InsertBooking,
   type ScheduleSlot, type InsertScheduleSlot,
   type Subscription, type InsertSubscription,
+  type StudentProfile,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -35,6 +36,8 @@ export interface IStorage {
   createSubscription(sub: InsertSubscription): Promise<Subscription>;
   updateSubscription(id: number, data: Partial<InsertSubscription>): Promise<Subscription>;
   getAllSubscriptions(): Promise<Subscription[]>;
+
+  getStudentProfile(userId: number): Promise<StudentProfile | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -108,7 +111,7 @@ export class DatabaseStorage implements IStorage {
     today.setHours(0, 0, 0, 0);
 
     return slots.filter(slot => {
-      if (!slot.specificDate) return true; // recurring — always show
+      if (!slot.specificDate) return true;
       const [d, m, y] = slot.specificDate.split('.');
       if (!d || !m || !y) return true;
       const slotDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
@@ -132,7 +135,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteScheduleSlot(id: number): Promise<void> {
-    // Nullify FK in bookings before deleting to avoid constraint error
     await db.update(bookings).set({ groupScheduleId: null }).where(eq(bookings.groupScheduleId, id));
     await db.delete(scheduleSlots).where(eq(scheduleSlots.id, id));
   }
@@ -168,6 +170,11 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSubscriptions(): Promise<Subscription[]> {
     return db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
+  }
+
+  async getStudentProfile(userId: number): Promise<StudentProfile | undefined> {
+    const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.userId, userId));
+    return profile || undefined;
   }
 }
 

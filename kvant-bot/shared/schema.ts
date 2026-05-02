@@ -72,6 +72,19 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   user: one(users, { fields: [subscriptions.userId], references: [users.id] }),
 }));
 
+export const studentProfiles = pgTable("student_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  roadmap: text("roadmap"),
+  tutorNotes: text("tutor_notes"),
+  homework: text("homework"),
+  materials: text("materials"),
+  lessonNotes: text("lesson_notes"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type StudentProfile = typeof studentProfiles.$inferSelect;
+
 // ── Auth tables (managed by site, referenced here for type safety) ──────────
 
 export const accounts = pgTable("accounts", {

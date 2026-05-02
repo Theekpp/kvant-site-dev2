@@ -81,6 +81,60 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
+async function notifyAdminNewBooking(
+  booking: typeof bookings.$inferSelect,
+  studentUser: typeof users.$inferSelect | undefined
+) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+
+  // Try ADMIN_CHAT_ID env var first, then query DB for admin account's telegramId
+  let adminTelegramId: number | null = null;
+  const envAdminId = parseInt(process.env.ADMIN_CHAT_ID || "");
+  if (!isNaN(envAdminId) && envAdminId > 0) {
+    adminTelegramId = envAdminId;
+  } else {
+    const [adminAcc] = await db.select({ userId: accounts.userId })
+      .from(accounts).where(eq(accounts.role, "admin")).limit(1);
+    if (adminAcc?.userId) {
+      const [adminUser] = await db.select({ telegramId: users.telegramId })
+        .from(users).where(eq(users.id, adminAcc.userId)).limit(1);
+      adminTelegramId = adminUser?.telegramId || null;
+    }
+  }
+  if (!adminTelegramId) return;
+
+  const name = studentUser
+    ? `${studentUser.firstName || ""} ${studentUser.lastName || ""}`.trim() || "Без имени"
+    : "Без имени";
+  const typeText = booking.type === "individual" ? "Индивидуальное" : "Групповое";
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: adminTelegramId,
+        text:
+          `📝 Новая запись с сайта!\n\n` +
+          `👤 ${name}\n` +
+          `📱 ${studentUser?.phone || "телефон не указан"}\n` +
+          `📚 ${typeText} занятие\n` +
+          `📅 ${booking.date} в ${booking.time}\n` +
+          `🆔 Запись #${booking.id}`,
+        reply_markup: JSON.stringify({
+          inline_keyboard: [[
+            { text: "✅ Подтвердить", callback_data: `confirm_booking_${booking.id}` },
+            { text: "❌ Отклонить", callback_data: `reject_booking_${booking.id}` },
+          ]],
+        }),
+      }),
+    });
+  } catch (e) {
+    console.error("[telegram] admin booking notification failed:", e);
+  }
+}
+
 export function registerAuthRoutes(app: Express) {
   // ── Register ──────────────────────────────────────────────────────────────
   app.post("/api/auth/register", authLimiter, async (req, res) => {
@@ -542,6 +596,10 @@ export function registerAuthRoutes(app: Express) {
       await db.update(subscriptions)
         .set({ remainingLessons: activeSub.remainingLessons - 1 })
         .where(eq(subscriptions.id, activeSub.id));
+
+      // Notify admin via Telegram with inline confirm/reject buttons
+      const [studentUser] = await db.select().from(users).where(eq(users.id, account.userId));
+      notifyAdminNewBooking(booking, studentUser).catch(() => {});
 
       return res.status(201).json(booking);
     } catch {

@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { startBot, setupGradeCallbacks } from "./bot";
 import { setupReminders } from "./reminders";
+import { storage } from "./storage";
 
 export function log(message: string, source = "bot") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -14,7 +15,6 @@ export function log(message: string, source = "bot") {
 }
 
 (async () => {
-  // Start Telegram bot
   const bot = startBot();
   if (bot) {
     setupGradeCallbacks(bot);
@@ -24,7 +24,6 @@ export function log(message: string, source = "bot") {
     log("Warning: TELEGRAM_BOT_TOKEN not set — bot not started");
   }
 
-  // Minimal Express server for health checks and process management
   const app = express();
   const httpServer = createServer(app);
 
@@ -44,6 +43,48 @@ export function log(message: string, source = "bot") {
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", service: "telegram-bot" });
+  });
+
+  // ─── YooKassa webhook ─────────────────────────────────────────────────────
+  app.post("/api/yookassa/webhook", async (req, res) => {
+    try {
+      const event = req.body;
+      log(`YooKassa webhook: ${event?.event} payment ${event?.object?.id}`);
+
+      if (event?.event === "payment.succeeded" && event?.object) {
+        const paymentObj = event.object;
+        const subIdStr = paymentObj?.metadata?.subscriptionId;
+        if (subIdStr) {
+          const subId = parseInt(subIdStr, 10);
+          if (!isNaN(subId)) {
+            const sub = await storage.getSubscription(subId);
+            if (sub && !sub.isPaid) {
+              await storage.updateSubscription(subId, { isPaid: true, status: "active" });
+              log(`Subscription #${subId} activated via YooKassa payment ${paymentObj.id}`);
+
+              // Notify student
+              if (bot) {
+                const user = await storage.getUser(sub.userId);
+                if (user?.telegramId) {
+                  await bot.sendMessage(
+                    user.telegramId,
+                    `✅ Оплата получена!\n\n` +
+                    `Абонемент на ${sub.totalLessons} занятий активирован.\n` +
+                    `Доступно занятий: ${sub.remainingLessons}\n\n` +
+                    `Теперь вы можете записываться на занятия! 🎓`
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      res.json({ status: "ok" });
+    } catch (err) {
+      console.error("YooKassa webhook error:", err);
+      res.status(500).json({ status: "error" });
+    }
   });
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
