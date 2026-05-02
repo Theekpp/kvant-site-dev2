@@ -46,7 +46,7 @@ interface ScheduleSlot {
   specificDate: string | null;
 }
 
-type Tab = "overview" | "subscriptions" | "order" | "book" | "history" | "profile";
+type Tab = "overview" | "subscriptions" | "order" | "book" | "history" | "file" | "profile";
 
 const CABINET_PLANS = [
   { id: "single", title: "Разовое занятие", subtitle: "1 занятие", price: "1 500 ₽", subType: "individual", lessons: 1, badgeCls: "bg-indigo-100 text-indigo-700", priceCls: "text-indigo-600", borderCls: "border-indigo-100", bgCls: "bg-indigo-50" },
@@ -60,12 +60,13 @@ const TYPE_LABELS: Record<string, string> = {
   group: "Групповое",
 };
 const STATUS_LABELS: Record<string, string> = {
+  pending: "Ожидает подтверждения",
   confirmed: "Подтверждено",
   completed: "Завершено",
   cancelled: "Отменено",
 };
 
-function isUpcoming(b: Booking) { return b.status === "confirmed"; }
+function isUpcoming(b: Booking) { return b.status === "confirmed" || b.status === "pending"; }
 
 const CANCELLATION_DEADLINE_HOURS = 24;
 
@@ -86,6 +87,7 @@ function hoursUntilBooking(b: Booking, now: Date = new Date()): number | null {
 }
 
 function canCancelBooking(b: Booking, now: Date = new Date()): boolean {
+  if (b.status === "pending") return true;
   const h = hoursUntilBooking(b, now);
   return h !== null && h >= CANCELLATION_DEADLINE_HOURS;
 }
@@ -123,7 +125,12 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
         <p className="font-semibold text-slate-800 text-sm">{TYPE_LABELS[booking.type] || booking.type}</p>
         <p className="text-xs text-slate-400 mt-0.5">{booking.date} · {booking.time}</p>
       </div>
-      {upcoming && (
+      {booking.status === "pending" && (
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 bg-amber-100 text-amber-700 whitespace-nowrap">
+          Ожидает
+        </span>
+      )}
+      {booking.status === "confirmed" && (
         <a
           href={`/video/booking-${booking.id}`}
           target="_blank"
@@ -147,7 +154,7 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
         >
           Отменить
         </button>
-      ) : (
+      ) : !upcoming ? (
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
           booking.status === "completed" ? "bg-green-100 text-green-700"
           : booking.status === "cancelled" ? "bg-slate-100 text-slate-500"
@@ -155,7 +162,7 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
         }`}>
           {STATUS_LABELS[booking.status] || booking.status}
         </span>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -190,6 +197,17 @@ export default function Cabinet() {
   const [orderLoading, setOrderLoading] = useState(false);
   const [payAllLoading, setPayAllLoading] = useState(false);
   const [payConsentChecked, setPayConsentChecked] = useState(false);
+
+  const [studentProfile, setStudentProfile] = useState<{
+    roadmap?: string | null;
+    tutorNotes?: string | null;
+    homework?: string | null;
+    materials?: string | null;
+    lessonNotes?: string | null;
+  } | null>(null);
+  const [telegramLinked, setTelegramLinked] = useState<{ linked: boolean; telegramUsername?: string | null } | null>(null);
+  const [telegramLinkToken, setTelegramLinkToken] = useState<{ token: string; expiresAt: string } | null>(null);
+  const [telegramLinkLoading, setTelegramLinkLoading] = useState(false);
 
   const totalOrderItems = Object.values(orderCart).reduce((a, b) => a + b, 0);
 
@@ -312,7 +330,11 @@ export default function Cabinet() {
       } catch {}
     }
 
-    loadData().catch(() => {}).finally(() => setLoading(false));
+    Promise.all([
+      loadData(),
+      api.get("/api/cabinet/student-profile").then(r => setStudentProfile(r.data)).catch(() => {}),
+      api.get("/api/cabinet/telegram-status").then(r => setTelegramLinked(r.data)).catch(() => {}),
+    ]).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const handlePaySubscription = async (subId: number) => {
@@ -459,6 +481,7 @@ export default function Cabinet() {
     { id: "order", label: "Выбрать тариф", icon: "⊕" },
     { id: "book", label: "Записаться", icon: "+" },
     { id: "history", label: "История", icon: "◷" },
+    { id: "file", label: "Личное дело", icon: "📚" },
     { id: "profile", label: "Профиль", icon: "◉" },
   ];
 
@@ -478,10 +501,15 @@ export default function Cabinet() {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-1.5 group">
-            <img src={kvantLogo} alt="K" className="w-9 h-9 object-contain" />
-            <span className="font-bold text-xl text-slate-800 -ml-0.5 group-hover:text-indigo-600 transition-colors">vant</span>
-          </a>
+          <div className="flex items-center gap-3">
+            <a href="/" className="flex items-center gap-1.5 group">
+              <img src={kvantLogo} alt="K" className="w-9 h-9 object-contain" />
+              <span className="font-bold text-xl text-slate-800 -ml-0.5 group-hover:text-indigo-600 transition-colors">vant</span>
+            </a>
+            <a href="/" className="hidden md:flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-600 transition border border-slate-200 hover:border-indigo-300 rounded-lg px-2.5 py-1">
+              ← На сайт
+            </a>
+          </div>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full">
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
@@ -527,7 +555,10 @@ export default function Cabinet() {
             <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <p className="text-green-800 text-sm font-medium">Занятие успешно забронировано!</p>
+            <div>
+              <p className="text-green-800 text-sm font-semibold">Заявка принята!</p>
+              <p className="text-green-700 text-xs mt-0.5">Ожидайте подтверждения от Кирилла — придёт уведомление в Telegram или по email.</p>
+            </div>
           </div>
         )}
         {paymentSuccess && (
@@ -1164,6 +1195,66 @@ export default function Cabinet() {
           </div>
         )}
 
+        {/* ── FILE (Личное дело) ── */}
+        {activeTab === "file" && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Личное дело</h2>
+              <p className="text-slate-400 text-sm mt-1">Ваш учебный план и материалы от преподавателя</p>
+            </div>
+
+            {!studentProfile ? (
+              <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                <p className="text-4xl mb-3">📚</p>
+                <p className="text-slate-500 font-semibold">Личное дело ещё не заполнено</p>
+                <p className="text-slate-400 text-sm mt-1">Преподаватель добавит учебный план и материалы после первого занятия</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {studentProfile.roadmap && (
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <span className="text-lg">🗺️</span> Учебный план
+                    </h3>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.roadmap}</p>
+                  </div>
+                )}
+                {studentProfile.homework && (
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <span className="text-lg">📝</span> Домашнее задание
+                    </h3>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.homework}</p>
+                  </div>
+                )}
+                {studentProfile.materials && (
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <span className="text-lg">📖</span> Материалы
+                    </h3>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.materials}</p>
+                  </div>
+                )}
+                {studentProfile.lessonNotes && (
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <span className="text-lg">🗒️</span> Заметки по занятиям
+                    </h3>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.lessonNotes}</p>
+                  </div>
+                )}
+                {!studentProfile.roadmap && !studentProfile.homework && !studentProfile.materials && !studentProfile.lessonNotes && (
+                  <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                    <p className="text-4xl mb-3">📚</p>
+                    <p className="text-slate-500 font-semibold">Личное дело создано, но пока пусто</p>
+                    <p className="text-slate-400 text-sm mt-1">Преподаватель скоро добавит материалы</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── PROFILE ── */}
         {activeTab === "profile" && (
           <div className="space-y-4">
@@ -1242,6 +1333,81 @@ export default function Cabinet() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Telegram Link Section */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
+                <span className="text-lg">✈️</span> Telegram
+              </h3>
+              <p className="text-xs text-slate-400 mb-4">Привяжите Telegram для получения уведомлений о занятиях</p>
+              {telegramLinked?.linked ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 bg-green-50 rounded-xl px-4 py-3">
+                    <span className="text-green-600 text-lg">✅</span>
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">Telegram привязан</p>
+                      {telegramLinked.telegramUsername && (
+                        <p className="text-xs text-green-600">@{telegramLinked.telegramUsername}</p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.post("/api/cabinet/unlink-telegram", {});
+                        setTelegramLinked({ linked: false });
+                        setTelegramLinkToken(null);
+                      } catch {}
+                    }}
+                    className="w-full py-2 border border-slate-200 text-slate-500 text-xs rounded-xl hover:bg-slate-50 transition"
+                  >
+                    Отвязать Telegram
+                  </button>
+                </div>
+              ) : telegramLinkToken ? (
+                <div className="space-y-3">
+                  <div className="bg-indigo-50 rounded-xl px-4 py-4 text-center">
+                    <p className="text-xs text-slate-500 mb-2">Отправьте боту команду:</p>
+                    <p className="font-mono text-lg font-bold text-indigo-700 tracking-widest">/start link_{telegramLinkToken.token}</p>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Действует до {new Date(telegramLinkToken.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <a
+                    href={`https://t.me/kvantphys_bot?start=link_${telegramLinkToken.token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition"
+                  >
+                    ✈️ Открыть бота
+                  </a>
+                  <button
+                    onClick={() => setTelegramLinkToken(null)}
+                    className="w-full py-2 border border-slate-200 text-slate-500 text-xs rounded-xl hover:bg-slate-50 transition"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    setTelegramLinkLoading(true);
+                    try {
+                      const r = await api.post("/api/cabinet/generate-telegram-link", {});
+                      setTelegramLinkToken(r.data);
+                    } catch {
+                      toast({ title: "Ошибка генерации токена", variant: "destructive" });
+                    } finally {
+                      setTelegramLinkLoading(false);
+                    }
+                  }}
+                  disabled={telegramLinkLoading}
+                  className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60"
+                >
+                  {telegramLinkLoading ? "Генерация..." : "✈️ Привязать Telegram"}
+                </button>
+              )}
             </div>
 
             <button

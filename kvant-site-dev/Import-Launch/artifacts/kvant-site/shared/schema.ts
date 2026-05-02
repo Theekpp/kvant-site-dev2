@@ -25,6 +25,8 @@ export const accounts = pgTable("accounts", {
   userId: integer("user_id").references(() => users.id),
   isEmailVerified: boolean("is_email_verified").notNull().default(false),
   role: text("role").notNull().default("user"),
+  telegramLinkToken: text("telegram_link_token"),
+  telegramLinkTokenExpiresAt: timestamp("telegram_link_token_expires_at"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -149,6 +151,17 @@ export const botActivity = pgTable("bot_activity", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+export const studentProfiles = pgTable("student_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  roadmap: text("roadmap"),
+  tutorNotes: text("tutor_notes"),
+  homework: text("homework"),
+  materials: text("materials"),
+  lessonNotes: text("lesson_notes"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
@@ -160,3 +173,4 @@ export type Refund = typeof refunds.$inferSelect;
 export type AdminAction = typeof adminActions.$inferSelect;
 export type BotActivity = typeof botActivity.$inferSelect;
 export type Recording = typeof recordings.$inferSelect;
+export type StudentProfile = typeof studentProfiles.$inferSelect;

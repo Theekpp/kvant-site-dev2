@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import {
-  accounts, refreshTokens, emailTokens, users, bookings, subscriptions, scheduleSlots, recordings,
+  accounts, refreshTokens, emailTokens, users, bookings, subscriptions, scheduleSlots, recordings, studentProfiles,
 } from "@shared/schema";
 import { eq, and, gt, desc, asc } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -524,7 +524,7 @@ export function registerAuthRoutes(app: Express) {
         });
       }
 
-      // Create the confirmed, paid booking with a unique board room id
+      // Create a pending booking (admin confirms) with a unique board room id
       const { randomUUID } = await import("crypto");
       const [booking] = await db.insert(bookings).values({
         userId: account.userId,
@@ -532,7 +532,7 @@ export function registerAuthRoutes(app: Express) {
         date,
         time,
         groupScheduleId: groupScheduleId || null,
-        status: "confirmed",
+        status: "pending",
         isPaid: true,
         paymentMethod: "subscription",
         roomId: randomUUID(),
@@ -563,25 +563,27 @@ export function registerAuthRoutes(app: Express) {
       const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
       if (!booking) return res.status(404).json({ message: "Запись не найдена" });
       if (booking.userId !== account.userId) return res.status(403).json({ message: "Нет доступа" });
-      if (booking.status !== "confirmed") {
-        return res.status(400).json({ message: "Можно отменить только подтверждённые занятия" });
+      if (booking.status !== "confirmed" && booking.status !== "pending") {
+        return res.status(400).json({ message: "Можно отменить только подтверждённые или ожидающие занятия" });
       }
 
-      // Validate 24h cancellation window
-      const dm = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(booking.date);
-      const tm = /^(\d{1,2}):(\d{2})$/.exec(booking.time);
-      if (!dm || !tm) {
-        return res.status(400).json({ message: "Некорректные дата/время записи" });
-      }
-      const lessonAt = new Date(
-        Number(dm[3]), Number(dm[2]) - 1, Number(dm[1]),
-        Number(tm[1]), Number(tm[2]), 0, 0
-      );
-      const hoursLeft = (lessonAt.getTime() - Date.now()) / (1000 * 60 * 60);
-      if (hoursLeft < CANCELLATION_DEADLINE_HOURS) {
-        return res.status(400).json({
-          message: `Отмена доступна не позднее чем за ${CANCELLATION_DEADLINE_HOURS} часа до начала занятия.`,
-        });
+      // For confirmed bookings, validate 24h cancellation window
+      if (booking.status === "confirmed") {
+        const dm = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(booking.date);
+        const tm = /^(\d{1,2}):(\d{2})$/.exec(booking.time);
+        if (!dm || !tm) {
+          return res.status(400).json({ message: "Некорректные дата/время записи" });
+        }
+        const lessonAt = new Date(
+          Number(dm[3]), Number(dm[2]) - 1, Number(dm[1]),
+          Number(tm[1]), Number(tm[2]), 0, 0
+        );
+        const hoursLeft = (lessonAt.getTime() - Date.now()) / (1000 * 60 * 60);
+        if (hoursLeft < CANCELLATION_DEADLINE_HOURS) {
+          return res.status(400).json({
+            message: `Отмена доступна не позднее чем за ${CANCELLATION_DEADLINE_HOURS} часа до начала занятия.`,
+          });
+        }
       }
 
       const [updated] = await db.update(bookings)
@@ -804,5 +806,107 @@ export function registerAuthRoutes(app: Express) {
   app.delete("/api/admin/recordings/:id", requireAuth, requireAdmin, async (req, res) => {
     await db.delete(recordings).where(eq(recordings.id, Number(req.params.id)));
     return res.json({ ok: true });
+  });
+
+  // ── Cabinet: Generate Telegram link token ─────────────────────────────────
+  app.post("/api/cabinet/generate-telegram-link", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account) return res.status(404).json({ message: "Аккаунт не найден" });
+      const token = crypto.randomBytes(3).toString("hex").toUpperCase();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await db.update(accounts)
+        .set({ telegramLinkToken: token, telegramLinkTokenExpiresAt: expiresAt })
+        .where(eq(accounts.id, account.id));
+      return res.json({ token, expiresAt });
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Public: Link Telegram account (called by bot) ─────────────────────────
+  app.post("/api/auth/link-telegram", async (req, res) => {
+    try {
+      const { token, telegramId, telegramUsername, firstName, lastName } = req.body;
+      if (!token || !telegramId) return res.status(400).json({ message: "Неверные данные" });
+      const allAccounts = await db.select().from(accounts)
+        .where(eq(accounts.telegramLinkToken, token));
+      const account = allAccounts[0];
+      if (!account) return res.status(404).json({ message: "Токен недействителен" });
+      const now = new Date();
+      if (account.telegramLinkTokenExpiresAt && account.telegramLinkTokenExpiresAt < now) {
+        return res.status(400).json({ message: "Токен истёк. Сгенерируйте новый в личном кабинете" });
+      }
+      if (account.userId) {
+        await db.update(users)
+          .set({ telegramId, telegramUsername: telegramUsername || null })
+          .where(eq(users.id, account.userId));
+      } else {
+        const existing = await db.select().from(users).where(eq(users.telegramId, telegramId));
+        let userId: number;
+        if (existing.length > 0) {
+          userId = existing[0].id;
+        } else {
+          const [newUser] = await db.insert(users).values({
+            telegramId,
+            telegramUsername: telegramUsername || null,
+            firstName: firstName || null,
+            lastName: lastName || null,
+          }).returning();
+          userId = newUser.id;
+        }
+        await db.update(accounts).set({ userId }).where(eq(accounts.id, account.id));
+      }
+      await db.update(accounts)
+        .set({ telegramLinkToken: null, telegramLinkTokenExpiresAt: null })
+        .where(eq(accounts.id, account.id));
+      return res.json({ success: true });
+    } catch (e) {
+      console.error("link-telegram error:", e);
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Public: Unlink Telegram account ──────────────────────────────────────
+  app.post("/api/cabinet/unlink-telegram", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.status(400).json({ message: "Аккаунт не привязан" });
+      await db.update(users)
+        .set({ telegramId: null, telegramUsername: null })
+        .where(eq(users.id, account.userId));
+      return res.json({ success: true });
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Cabinet: Telegram link status ─────────────────────────────────────────
+  app.get("/api/cabinet/telegram-status", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.json({ linked: false });
+      const [user] = await db.select().from(users).where(eq(users.id, account.userId));
+      return res.json({
+        linked: !!user?.telegramId,
+        telegramId: user?.telegramId || null,
+        telegramUsername: user?.telegramUsername || null,
+      });
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Cabinet: Student profile (read-only for student) ──────────────────────
+  app.get("/api/cabinet/student-profile", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.json(null);
+      const [profile] = await db.select().from(studentProfiles)
+        .where(eq(studentProfiles.userId, account.userId));
+      return res.json(profile || null);
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
   });
 }

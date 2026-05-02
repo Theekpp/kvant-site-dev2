@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser, useGetUserDetails } from "@/lib/admin-api";
+import { useGetUsers, useCreateUser, useGetUserDetails, useGetStudentProfile, useUpdateStudentProfile } from "@/lib/admin-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -150,6 +150,9 @@ function StudentCard({ userId, onClose }: { userId: number; onClose: () => void 
             <CreditCard className="h-3.5 w-3.5" />
             Абонементы ({subscriptions?.length || 0})
           </TabsTrigger>
+          <TabsTrigger value="file" className="flex-1 gap-1.5">
+            📚 Личное дело
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="bookings" className="mt-3">
@@ -202,7 +205,106 @@ function StudentCard({ userId, onClose }: { userId: number; onClose: () => void 
             ))}
           </div>
         </TabsContent>
+
+        <TabsContent value="file" className="mt-3">
+          <StudentFileTab userId={userId} />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function StudentFileTab({ userId }: { userId: number }) {
+  const { data: profile, isLoading } = useGetStudentProfile(userId);
+  const updateProfile = useUpdateStudentProfile(userId);
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    roadmap: "", tutorNotes: "", homework: "", materials: "", lessonNotes: ""
+  });
+
+  if (isLoading) {
+    return <div className="py-6 text-center text-sm text-muted-foreground">Загрузка...</div>;
+  }
+
+  const handleEdit = () => {
+    setForm({
+      roadmap: profile?.roadmap || "",
+      tutorNotes: profile?.tutorNotes || "",
+      homework: profile?.homework || "",
+      materials: profile?.materials || "",
+      lessonNotes: profile?.lessonNotes || "",
+    });
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      await updateProfile.mutateAsync(form);
+      setEditing(false);
+      toast({ title: "Личное дело сохранено" });
+    } catch {
+      toast({ title: "Ошибка сохранения", variant: "destructive" });
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="space-y-3">
+        {[
+          { key: "roadmap", label: "🗺️ Учебный план" },
+          { key: "tutorNotes", label: "🔒 Заметки преподавателя (не видны ученику)" },
+          { key: "homework", label: "📝 Домашнее задание" },
+          { key: "materials", label: "📖 Материалы (ссылки, описание)" },
+          { key: "lessonNotes", label: "🗒️ Заметки по занятиям" },
+        ].map(({ key, label }) => (
+          <div key={key}>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">{label}</label>
+            <textarea
+              rows={3}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background"
+              value={(form as any)[key]}
+              onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+              placeholder={`Введите ${label.split(" ").slice(1).join(" ").toLowerCase()}...`}
+            />
+          </div>
+        ))}
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" onClick={handleSave} disabled={updateProfile.isPending}>
+            {updateProfile.isPending ? "Сохранение..." : "Сохранить"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Отмена</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const hasContent = profile?.roadmap || profile?.tutorNotes || profile?.homework || profile?.materials || profile?.lessonNotes;
+
+  return (
+    <div className="space-y-3">
+      {!hasContent ? (
+        <div className="py-8 text-center">
+          <p className="text-sm text-muted-foreground mb-3">Личное дело пустое</p>
+          <Button size="sm" onClick={handleEdit}>Заполнить</Button>
+        </div>
+      ) : (
+        <>
+          {[
+            { key: "roadmap", label: "🗺️ Учебный план", value: profile?.roadmap },
+            { key: "tutorNotes", label: "🔒 Заметки (только преп.)", value: profile?.tutorNotes },
+            { key: "homework", label: "📝 Домашнее задание", value: profile?.homework },
+            { key: "materials", label: "📖 Материалы", value: profile?.materials },
+            { key: "lessonNotes", label: "🗒️ Заметки по занятиям", value: profile?.lessonNotes },
+          ].filter(f => f.value).map(({ label, value }) => (
+            <div key={label} className="rounded-lg bg-muted/30 px-3 py-2">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">{label}</p>
+              <p className="text-sm whitespace-pre-wrap">{value}</p>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" onClick={handleEdit} className="w-full">Редактировать</Button>
+        </>
+      )}
     </div>
   );
 }

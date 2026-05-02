@@ -41,10 +41,14 @@ function pe(emoji: string): string {
   return id ? `<tg-emoji emoji-id="${id}">${emoji}</tg-emoji>` : emoji;
 }
 
+const SITE_URL = process.env.SITE_URL || "https://kvant.replit.app";
+const SITE_INTERNAL_URL = process.env.SITE_INTERNAL_URL || "http://localhost:5000";
+
 const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "📝 Записаться на занятие" }, { text: "💰 Услуги и оплата" }],
     [{ text: "📋 Мои записи" }],
+    [{ text: "🌐 Личный кабинет", web_app: { url: `${SITE_URL}/cabinet` } }],
     [{ text: "ℹ️ О менторе" }, { text: "📞 Контакты" }],
     [{ text: "❓ Задать вопрос" }, { text: "📖 Формат занятий" }],
   ],
@@ -321,6 +325,41 @@ export function startBot() {
         goal: null,
         phone: null,
       });
+    }
+
+    if (param && param.startsWith("link_")) {
+      const token = param.replace("link_", "");
+      try {
+        const resp = await fetch(`${SITE_INTERNAL_URL}/api/auth/link-telegram`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            telegramId: chatId,
+            telegramUsername: msg.from?.username || null,
+            firstName: msg.from?.first_name || null,
+            lastName: msg.from?.last_name || null,
+          }),
+        });
+        if (resp.ok) {
+          await bot.sendMessage(chatId,
+            "✅ Аккаунт успешно привязан!\n\nТеперь уведомления о занятиях будут приходить сюда.",
+            { reply_markup: MAIN_KEYBOARD }
+          );
+        } else {
+          const err = await resp.json() as any;
+          await bot.sendMessage(chatId,
+            `❌ Не удалось привязать аккаунт: ${err.message || "Неверный токен"}\n\nСгенерируйте новый код в личном кабинете на сайте.`,
+            { reply_markup: MAIN_KEYBOARD }
+          );
+        }
+      } catch {
+        await bot.sendMessage(chatId,
+          "❌ Ошибка соединения с сервером. Попробуйте позже.",
+          { reply_markup: MAIN_KEYBOARD }
+        );
+      }
+      return;
     }
 
     if (param === "about") {

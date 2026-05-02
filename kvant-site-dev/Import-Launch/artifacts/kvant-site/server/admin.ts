@@ -1,12 +1,27 @@
 import type { Express, Request } from "express";
 import { db } from "./db";
-import { users, accounts, bookings, subscriptions, scheduleSlots, reviews, adminActions, botActivity, payments } from "@shared/schema";
+import { users, accounts, bookings, subscriptions, scheduleSlots, reviews, adminActions, botActivity, payments, studentProfiles } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, ne, isNotNull, count } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "./auth";
 
 function getAdminEmail(req: Request): string {
   const user = req.user as any;
   return user?.email || user?.account?.email || "admin";
+}
+
+async function sendTelegramNotification(telegramId: number | null | undefined, text: string) {
+  if (!telegramId) return;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: telegramId, text }),
+    });
+  } catch (e) {
+    console.error("[telegram] notification failed:", e);
+  }
 }
 
 async function logAction(
@@ -175,6 +190,7 @@ export function registerAdminRoutes(app: Express) {
     try {
       const id = Number(req.params.id);
       const { status, isPaid, paymentMethod, subscriptionId } = req.body;
+      const [prevBooking] = await db.select().from(bookings).where(eq(bookings.id, id));
       const updates: Partial<typeof bookings.$inferInsert> = {};
       if (status !== undefined) updates.status = status;
       if (isPaid !== undefined) updates.isPaid = isPaid;
@@ -195,6 +211,27 @@ export function registerAdminRoutes(app: Express) {
         }
       }
 
+      // Send Telegram notification when booking status changes
+      if (status && prevBooking && status !== prevBooking.status) {
+        const [bookingUser] = await db.select().from(users).where(eq(users.id, updated.userId));
+        if (bookingUser?.telegramId) {
+          const typeText = updated.type === "individual" ? "индивидуальное" : "групповое";
+          if (status === "confirmed") {
+            await sendTelegramNotification(bookingUser.telegramId,
+              `✅ Ваша запись подтверждена!\n\n📚 ${typeText.charAt(0).toUpperCase() + typeText.slice(1)} занятие\n📅 ${updated.date} в ${updated.time}\n\nДо встречи! 🎓`
+            );
+          } else if (status === "cancelled") {
+            await sendTelegramNotification(bookingUser.telegramId,
+              `❌ Ваша запись отменена.\n\n📚 ${typeText.charAt(0).toUpperCase() + typeText.slice(1)} занятие\n📅 ${updated.date} в ${updated.time}\n\nЕсли у вас вопросы, напишите @anisimovvd`
+            );
+          } else if (status === "completed") {
+            await sendTelegramNotification(bookingUser.telegramId,
+              `🎓 Занятие завершено!\n\n📅 ${updated.date} в ${updated.time}\nСпасибо за работу! До следующего раза 🚀`
+            );
+          }
+        }
+      }
+
       await logAction(getAdminEmail(req), "update_booking", "booking", id, { status, isPaid, paymentMethod });
       res.json(updated);
     } catch {
@@ -207,9 +244,12 @@ export function registerAdminRoutes(app: Express) {
       const { userId, message } = req.body;
       const [user] = await db.select().from(users).where(eq(users.id, Number(userId)));
       if (!user) return res.status(404).json({ message: "Пользователь не найден" });
-      console.log(`[NOTIFY] user ${userId}: ${message}`);
+      if (user.telegramId) {
+        await sendTelegramNotification(user.telegramId, message);
+      }
+      console.log(`[NOTIFY] user ${userId} (tg:${user.telegramId}): ${message}`);
       await logAction(getAdminEmail(req), "notify_user", "user", Number(userId), { message });
-      res.json({ success: true });
+      res.json({ success: true, sentToTelegram: !!user.telegramId });
     } catch {
       res.status(500).json({ message: "Ошибка сервера" });
     }
@@ -566,6 +606,46 @@ export function registerAdminRoutes(app: Express) {
       });
     } catch (e) {
       console.error(e);
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Student profiles ───────────────────────────────────────────────────────
+  app.get("/api/admin/users/:id/profile", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      const [profile] = await db.select().from(studentProfiles)
+        .where(eq(studentProfiles.userId, userId));
+      return res.json(profile || null);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.put("/api/admin/users/:id/profile", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      const { roadmap, tutorNotes, homework, materials, lessonNotes } = req.body;
+      const [existing] = await db.select().from(studentProfiles)
+        .where(eq(studentProfiles.userId, userId));
+      const data = {
+        roadmap: roadmap ?? null,
+        tutorNotes: tutorNotes ?? null,
+        homework: homework ?? null,
+        materials: materials ?? null,
+        lessonNotes: lessonNotes ?? null,
+        updatedAt: new Date(),
+      };
+      let profile;
+      if (existing) {
+        [profile] = await db.update(studentProfiles).set(data)
+          .where(eq(studentProfiles.userId, userId)).returning();
+      } else {
+        [profile] = await db.insert(studentProfiles).values({ userId, ...data }).returning();
+      }
+      await logAction(getAdminEmail(req), "update_student_profile", "user", userId, {});
+      return res.json(profile);
+    } catch {
       res.status(500).json({ message: "Ошибка сервера" });
     }
   });

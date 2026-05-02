@@ -35,6 +35,35 @@ The workflow runs: `cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm
 - `RESEND_API_KEY` — Resend email API key (optional)
 - `FROM_EMAIL` — Sender email address
 - `FRONTEND_URL` — Full app URL for email links
+- `TELEGRAM_BOT_TOKEN` — Telegram bot token (for site→Telegram notifications)
+- `SITE_URL` — Public site URL used by the bot for mini-app button (default: https://kvant.replit.app)
+- `SITE_INTERNAL_URL` — Internal URL for bot→site API calls (default: http://localhost:5000)
+
+## Features Implemented
+
+### Booking Flow
+- New site bookings have status `"pending"` (await admin confirmation)
+- Admin confirms/cancels/completes booking → Telegram notification sent to student
+- Pending bookings can be cancelled anytime without the 24h restriction
+- Success banner shows "Заявка принята! Ожидайте подтверждения"
+
+### Личное дело (Student File)
+- Admin can fill per-student profile: учебный план, заметки преп., ДЗ, материалы, заметки по занятиям
+- Student sees read-only view of their file in the "Личное дело" cabinet tab
+- Tutor notes are only visible to admin
+
+### Telegram Integration
+- Students link Telegram from Profile tab → generate 6-char token → send `/start link_TOKEN` to bot
+- Bot calls `POST /api/auth/link-telegram` to complete linking
+- After linking: booking confirmations/cancellations sent as Telegram messages
+- Admin "Уведомить" button now sends real Telegram messages
+- Bot keyboard has "🌐 Личный кабинет" mini-app button
+
+### Cabinet UI
+- "← На сайт" link in cabinet header
+- "Личное дело" tab for students (read-only)
+- "Профиль" tab includes Telegram linking section
+- Upcoming bookings show amber "Ожидает" badge for pending status
 
 ## Admin Panel
 

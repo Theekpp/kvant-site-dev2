@@ -223,3 +223,19 @@ export function useGetAnalytics() {
     staleTime: 60_000,
   });
 }
+
+export function useGetStudentProfile(userId: number | null) {
+  return useQuery({
+    queryKey: ["/api/admin/users", userId, "profile"],
+    queryFn: () => adminFetch(`/api/admin/users/${userId}/profile`),
+    enabled: userId !== null,
+  });
+}
+
+export function useUpdateStudentProfile(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => adminFetch(`/api/admin/users/${userId}/profile`, { method: "PUT", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "profile"] }),
+  });
+}
