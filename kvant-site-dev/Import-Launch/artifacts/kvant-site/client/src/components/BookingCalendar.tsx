@@ -375,6 +375,7 @@ export function BookingCalendar({
               const realDayIdx = visibleDayIndices[visibleIdx];
               const isPast = date.getTime() < today.getTime();
               const isToday = date.getTime() === today.getTime();
+              const now = new Date();
               const dateStr = formatDateDDMMYYYY(date);
               const daySlots = slotsByDay[realDayIdx] || [];
               const dow = date.getDay();
@@ -411,9 +412,10 @@ export function BookingCalendar({
                     const top = (minutesFromTop * HOUR_HEIGHT) / 60;
                     const heightPx = HOUR_HEIGHT - 4;
                     const alreadyBooked = userBookingsKey.has(`${slot.slotType}|${dateStr}|${slot.time}`);
-                    const blocked = isPast || !hasActiveSub || alreadyBooked;
-                    const blockedReason = isPast
-                      ? "Дата уже прошла"
+                    const isSlotPast = isToday && (hour < now.getHours() || (hour === now.getHours() && minute <= now.getMinutes()));
+                    const blocked = isPast || isSlotPast || !hasActiveSub || alreadyBooked;
+                    const blockedReason = isPast || isSlotPast
+                      ? "Время уже прошло"
                       : alreadyBooked
                         ? "Вы уже записаны"
                         : !hasActiveSub
