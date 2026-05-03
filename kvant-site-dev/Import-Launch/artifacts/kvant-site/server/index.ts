@@ -62,16 +62,15 @@ app.use(
   }),
 );
 
-// ── Global rate limiting ─────────────────────────────────────────────────────
-const globalLimiter = rateLimit({
+// ── API rate limiting (only /api/* — never static assets or Vite HMR) ────────
+const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 300,
+  max: 600,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Слишком много запросов, попробуйте позже." },
-  skip: (req) => req.path.startsWith("/board-app") || req.path.startsWith("/lk-ws"),
 });
-app.use(globalLimiter);
+app.use("/api", apiLimiter);
 
 // ── Proxy to kvant-board service (Excalidraw collaboration board) ────────────
 // Mounted BEFORE body parsers so request bodies are streamed unmodified.
