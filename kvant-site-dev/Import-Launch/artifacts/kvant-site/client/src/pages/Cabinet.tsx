@@ -66,7 +66,12 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Отменено",
 };
 
-function isUpcoming(b: Booking) { return b.status === "confirmed" || b.status === "pending"; }
+function isUpcoming(b: Booking) {
+  if (b.status !== "confirmed" && b.status !== "pending") return false;
+  const dt = bookingDateTime(b);
+  if (!dt) return true;
+  return dt.getTime() + 60 * 60 * 1000 > Date.now();
+}
 
 const CANCELLATION_DEADLINE_HOURS = 24;
 

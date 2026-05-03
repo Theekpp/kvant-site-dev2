@@ -1340,6 +1340,18 @@ async function finalizeBooking(bot: TelegramBot, chatId: number, data: Record<st
   }
 }
 
+function isBookingUpcoming(b: { date: string; time: string; status: string }): boolean {
+  if (b.status !== "confirmed" && b.status !== "pending") return false;
+  const dm = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(b.date);
+  const tm = /^(\d{1,2}):(\d{2})$/.exec(b.time);
+  if (!dm || !tm) return true;
+  const dt = new Date(
+    parseInt(dm[3]), parseInt(dm[2]) - 1, parseInt(dm[1]),
+    parseInt(tm[1]), parseInt(tm[2]), 0, 0
+  );
+  return dt.getTime() + 60 * 60 * 1000 > Date.now();
+}
+
 async function sendMyBookings(bot: TelegramBot, chatId: number) {
   const user = await storage.getUserByTelegramId(chatId);
   if (!user) {
@@ -1352,7 +1364,7 @@ async function sendMyBookings(bot: TelegramBot, chatId: number) {
     storage.getSubscriptionsByUserId(user.id),
   ]);
 
-  const activeBookings = bookings.filter(b => b.status === "confirmed" || b.status === "pending");
+  const activeBookings = bookings.filter(isBookingUpcoming);
   const activeSubs = subs.filter(s => s.isPaid && s.remainingLessons > 0);
 
   let msg = `${pe("📝")} Твои данные:\n\n`;
@@ -1518,8 +1530,8 @@ async function sendLessonHistory(bot: TelegramBot, chatId: number) {
     completed: "🎓",
   };
 
-  const upcoming = sorted.filter(b => b.status === "confirmed" || b.status === "pending");
-  const past = sorted.filter(b => b.status === "completed" || b.status === "cancelled");
+  const upcoming = sorted.filter(isBookingUpcoming);
+  const past = sorted.filter(b => !isBookingUpcoming(b));
 
   let msg = `📚 История занятий\n`;
 
