@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import {
   accounts, refreshTokens, emailTokens, users, bookings, subscriptions, scheduleSlots, recordings, studentProfiles,
+  homeworkAssignments, homeworkSubmissions, lessonJournalEntries, studentMaterials, roadmapTopics,
 } from "@shared/schema";
 import { eq, and, gt, desc, asc, ne } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -969,6 +970,99 @@ export function registerAuthRoutes(app: Express) {
       const [profile] = await db.select().from(studentProfiles)
         .where(eq(studentProfiles.userId, account.userId));
       return res.json(profile || null);
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Cabinet: Homework (student reads + submits) ─────────────────────────────
+  app.get("/api/cabinet/homework", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.json([]);
+      const list = await db.select().from(homeworkAssignments)
+        .where(eq(homeworkAssignments.userId, account.userId))
+        .orderBy(desc(homeworkAssignments.createdAt));
+      const withSubs = await Promise.all(list.map(async (hw) => {
+        const [sub] = await db.select().from(homeworkSubmissions)
+          .where(eq(homeworkSubmissions.homeworkId, hw.id))
+          .orderBy(desc(homeworkSubmissions.submittedAt)).limit(1);
+        return { ...hw, submission: sub || null };
+      }));
+      return res.json(withSubs);
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/cabinet/homework/:id/submit", requireAuth, async (req, res) => {
+    try {
+      const hwId = Number(req.params.id);
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.status(403).json({ message: "Нет доступа" });
+      const [hw] = await db.select().from(homeworkAssignments)
+        .where(and(eq(homeworkAssignments.id, hwId), eq(homeworkAssignments.userId, account.userId)));
+      if (!hw) return res.status(404).json({ message: "Задание не найдено" });
+      const { text, linkUrl } = req.body;
+      const [sub] = await db.insert(homeworkSubmissions).values({
+        homeworkId: hwId,
+        text: text || null,
+        linkUrl: linkUrl || null,
+        submittedAt: new Date(),
+      }).returning();
+      await db.update(homeworkAssignments)
+        .set({ status: "submitted", updatedAt: new Date() })
+        .where(eq(homeworkAssignments.id, hwId));
+      return res.json(sub);
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Cabinet: Lesson Journal (student reads) ─────────────────────────────────
+  app.get("/api/cabinet/journal", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.json([]);
+      const list = await db.select({
+        id: lessonJournalEntries.id,
+        date: lessonJournalEntries.date,
+        topic: lessonJournalEntries.topic,
+        coveredSummary: lessonJournalEntries.coveredSummary,
+        nextSteps: lessonJournalEntries.nextSteps,
+        createdAt: lessonJournalEntries.createdAt,
+      }).from(lessonJournalEntries)
+        .where(eq(lessonJournalEntries.userId, account.userId))
+        .orderBy(desc(lessonJournalEntries.createdAt));
+      return res.json(list);
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Cabinet: Materials (student reads) ─────────────────────────────────────
+  app.get("/api/cabinet/materials", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.json([]);
+      const list = await db.select().from(studentMaterials)
+        .where(eq(studentMaterials.userId, account.userId))
+        .orderBy(desc(studentMaterials.createdAt));
+      return res.json(list);
+    } catch {
+      return res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Cabinet: Roadmap (student reads) ───────────────────────────────────────
+  app.get("/api/cabinet/roadmap", requireAuth, async (req, res) => {
+    try {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, req.accountId!));
+      if (!account?.userId) return res.json([]);
+      const list = await db.select().from(roadmapTopics)
+        .where(eq(roadmapTopics.userId, account.userId))
+        .orderBy(roadmapTopics.sortOrder, roadmapTopics.createdAt);
+      return res.json(list);
     } catch {
       return res.status(500).json({ message: "Ошибка сервера" });
     }

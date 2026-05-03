@@ -36,6 +36,12 @@ A full-stack website for a physics tutor ("Физика с Кириллом"). I
 - `bookings` — Lesson bookings (userId→users, date, time, status, isPaid, type)
 - `subscriptions` — Lesson subscriptions/passes (userId→users, totalLessons, remainingLessons, isPaid, type)
 - `schedule_slots` — Weekly schedule slots (dayOfWeek, time, title, maxStudents, slotType, specificDate)
+- `student_profiles` — Legacy plain-text notes (roadmap, tutorNotes, homework, materials, lessonNotes)
+- `homework_assignments` — Structured homework tasks (userId, title, description, dueDate, status, adminFeedback)
+- `homework_submissions` — Student homework answers (homeworkId, text, linkUrl, submittedAt)
+- `lesson_journal_entries` — Per-lesson records (userId, date, topic, coveredSummary, nextSteps, parentNote)
+- `student_materials` — Resource links (userId, title, url, type, topicTag)
+- `roadmap_topics` — Learning plan items (userId, section, title, status, sortOrder)
 
 ## API Routes
 

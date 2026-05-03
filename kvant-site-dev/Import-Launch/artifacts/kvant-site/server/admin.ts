@@ -1,6 +1,6 @@
 import type { Express, Request } from "express";
 import { db } from "./db";
-import { users, accounts, bookings, subscriptions, scheduleSlots, reviews, adminActions, botActivity, payments, studentProfiles } from "@shared/schema";
+import { users, accounts, bookings, subscriptions, scheduleSlots, reviews, adminActions, botActivity, payments, studentProfiles, homeworkAssignments, homeworkSubmissions, lessonJournalEntries, studentMaterials, roadmapTopics } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, ne, isNotNull, count } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "./auth";
 
@@ -645,6 +645,248 @@ export function registerAdminRoutes(app: Express) {
       }
       await logAction(getAdminEmail(req), "update_student_profile", "user", userId, {});
       return res.json(profile);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Homework Assignments ────────────────────────────────────────────────────
+  app.get("/api/admin/users/:userId/homework", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const list = await db.select().from(homeworkAssignments)
+        .where(eq(homeworkAssignments.userId, userId))
+        .orderBy(desc(homeworkAssignments.createdAt));
+      const withSubs = await Promise.all(list.map(async (hw) => {
+        const [sub] = await db.select().from(homeworkSubmissions)
+          .where(eq(homeworkSubmissions.homeworkId, hw.id)).orderBy(desc(homeworkSubmissions.submittedAt)).limit(1);
+        return { ...hw, submission: sub || null };
+      }));
+      return res.json(withSubs);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/homework", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const { title, description, dueDate, bookingId } = req.body;
+      if (!title) return res.status(400).json({ message: "Название обязательно" });
+      const [hw] = await db.insert(homeworkAssignments).values({
+        userId, title, description: description || null,
+        dueDate: dueDate || null, bookingId: bookingId || null, status: "assigned",
+      }).returning();
+      await logAction(getAdminEmail(req), "create_homework", "homework", hw.id, { userId, title });
+      return res.json(hw);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.patch("/api/admin/homework/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { title, description, dueDate, status, adminFeedback } = req.body;
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (title !== undefined) updates.title = title;
+      if (description !== undefined) updates.description = description;
+      if (dueDate !== undefined) updates.dueDate = dueDate;
+      if (status !== undefined) updates.status = status;
+      if (adminFeedback !== undefined) updates.adminFeedback = adminFeedback;
+      const [updated] = await db.update(homeworkAssignments).set(updates).where(eq(homeworkAssignments.id, id)).returning();
+      await logAction(getAdminEmail(req), "update_homework", "homework", id, { status });
+      return res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.delete("/api/admin/homework/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await db.delete(homeworkAssignments).where(eq(homeworkAssignments.id, id));
+      await logAction(getAdminEmail(req), "delete_homework", "homework", id, {});
+      return res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Lesson Journal ──────────────────────────────────────────────────────────
+  app.get("/api/admin/users/:userId/journal", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const list = await db.select().from(lessonJournalEntries)
+        .where(eq(lessonJournalEntries.userId, userId))
+        .orderBy(desc(lessonJournalEntries.createdAt));
+      return res.json(list);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/journal", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const { date, topic, coveredSummary, nextSteps, parentNote, bookingId } = req.body;
+      if (!date || !topic) return res.status(400).json({ message: "Дата и тема обязательны" });
+      const [entry] = await db.insert(lessonJournalEntries).values({
+        userId, date, topic,
+        coveredSummary: coveredSummary || null,
+        nextSteps: nextSteps || null,
+        parentNote: parentNote || null,
+        bookingId: bookingId || null,
+      }).returning();
+      await logAction(getAdminEmail(req), "create_journal_entry", "journal", entry.id, { userId, date, topic });
+      return res.json(entry);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.patch("/api/admin/journal/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { date, topic, coveredSummary, nextSteps, parentNote } = req.body;
+      const updates: Record<string, any> = {};
+      if (date !== undefined) updates.date = date;
+      if (topic !== undefined) updates.topic = topic;
+      if (coveredSummary !== undefined) updates.coveredSummary = coveredSummary;
+      if (nextSteps !== undefined) updates.nextSteps = nextSteps;
+      if (parentNote !== undefined) updates.parentNote = parentNote;
+      const [updated] = await db.update(lessonJournalEntries).set(updates).where(eq(lessonJournalEntries.id, id)).returning();
+      await logAction(getAdminEmail(req), "update_journal_entry", "journal", id, {});
+      return res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.delete("/api/admin/journal/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await db.delete(lessonJournalEntries).where(eq(lessonJournalEntries.id, id));
+      await logAction(getAdminEmail(req), "delete_journal_entry", "journal", id, {});
+      return res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Student Materials ────────────────────────────────────────────────────────
+  app.get("/api/admin/users/:userId/materials", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const list = await db.select().from(studentMaterials)
+        .where(eq(studentMaterials.userId, userId))
+        .orderBy(desc(studentMaterials.createdAt));
+      return res.json(list);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/materials", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const { title, url, type, topicTag } = req.body;
+      if (!title || !url) return res.status(400).json({ message: "Название и ссылка обязательны" });
+      const [mat] = await db.insert(studentMaterials).values({
+        userId, title, url,
+        type: type || "theory",
+        topicTag: topicTag || null,
+      }).returning();
+      await logAction(getAdminEmail(req), "create_material", "material", mat.id, { userId, title });
+      return res.json(mat);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.patch("/api/admin/materials/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { title, url, type, topicTag } = req.body;
+      const updates: Record<string, any> = {};
+      if (title !== undefined) updates.title = title;
+      if (url !== undefined) updates.url = url;
+      if (type !== undefined) updates.type = type;
+      if (topicTag !== undefined) updates.topicTag = topicTag;
+      const [updated] = await db.update(studentMaterials).set(updates).where(eq(studentMaterials.id, id)).returning();
+      await logAction(getAdminEmail(req), "update_material", "material", id, {});
+      return res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.delete("/api/admin/materials/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await db.delete(studentMaterials).where(eq(studentMaterials.id, id));
+      await logAction(getAdminEmail(req), "delete_material", "material", id, {});
+      return res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ── Roadmap Topics ───────────────────────────────────────────────────────────
+  app.get("/api/admin/users/:userId/roadmap", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const list = await db.select().from(roadmapTopics)
+        .where(eq(roadmapTopics.userId, userId))
+        .orderBy(roadmapTopics.sortOrder, roadmapTopics.createdAt);
+      return res.json(list);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/roadmap", ...guard, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const { section, title, status, sortOrder } = req.body;
+      if (!title) return res.status(400).json({ message: "Название темы обязательно" });
+      const [topic] = await db.insert(roadmapTopics).values({
+        userId,
+        section: section || "Общее",
+        title,
+        status: status || "planned",
+        sortOrder: sortOrder ?? 0,
+      }).returning();
+      await logAction(getAdminEmail(req), "create_roadmap_topic", "roadmap", topic.id, { userId, title });
+      return res.json(topic);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.patch("/api/admin/roadmap/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { section, title, status, sortOrder } = req.body;
+      const updates: Record<string, any> = {};
+      if (section !== undefined) updates.section = section;
+      if (title !== undefined) updates.title = title;
+      if (status !== undefined) updates.status = status;
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      const [updated] = await db.update(roadmapTopics).set(updates).where(eq(roadmapTopics.id, id)).returning();
+      await logAction(getAdminEmail(req), "update_roadmap_topic", "roadmap", id, { status });
+      return res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.delete("/api/admin/roadmap/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await db.delete(roadmapTopics).where(eq(roadmapTopics.id, id));
+      await logAction(getAdminEmail(req), "delete_roadmap_topic", "roadmap", id, {});
+      return res.json({ success: true });
     } catch {
       res.status(500).json({ message: "Ошибка сервера" });
     }

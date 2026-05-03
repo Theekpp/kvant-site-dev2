@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser, useGetUserDetails, useGetStudentProfile, useUpdateStudentProfile } from "@/lib/admin-api";
+import {
+  useGetUsers, useCreateUser, useGetUserDetails, useGetStudentProfile, useUpdateStudentProfile,
+  useGetStudentHomework, useCreateHomework, useUpdateHomework, useDeleteHomework,
+  useGetStudentJournal, useCreateJournalEntry, useDeleteJournalEntry,
+  useGetStudentMaterials, useCreateMaterial, useDeleteMaterial,
+  useGetStudentRoadmap, useCreateRoadmapTopic, useUpdateRoadmapTopic, useDeleteRoadmapTopic,
+} from "@/lib/admin-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserCircle2, UserPlus, Phone, ExternalLink, CalendarCheck, CreditCard, Banknote, Clock, Monitor } from "lucide-react";
+import { UserCircle2, UserPlus, Phone, ExternalLink, CalendarCheck, CreditCard, Banknote, Clock, Monitor, Plus, Trash2, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -215,97 +221,403 @@ function StudentCard({ userId, onClose }: { userId: number; onClose: () => void 
 }
 
 function StudentFileTab({ userId }: { userId: number }) {
-  const { data: profile, isLoading } = useGetStudentProfile(userId);
+  const { data: profile, isLoading: profileLoading } = useGetStudentProfile(userId);
   const updateProfile = useUpdateStudentProfile(userId);
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    roadmap: "", tutorNotes: "", homework: "", materials: "", lessonNotes: ""
-  });
+  const [form, setForm] = useState({ roadmap: "", tutorNotes: "", homework: "", materials: "", lessonNotes: "" });
 
-  if (isLoading) {
-    return <div className="py-6 text-center text-sm text-muted-foreground">Загрузка...</div>;
-  }
+  // ── Homework state ─────────────────────────────────────────────────────────
+  const { data: hwList = [], isLoading: hwLoading } = useGetStudentHomework(userId);
+  const createHw = useCreateHomework(userId);
+  const updateHw = useUpdateHomework(userId);
+  const deleteHw = useDeleteHomework(userId);
+  const [hwForm, setHwForm] = useState({ title: "", description: "", dueDate: "" });
+  const [hwOpen, setHwOpen] = useState(false);
+  const [gradingId, setGradingId] = useState<number | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("accepted");
 
-  const handleEdit = () => {
+  // ── Journal state ──────────────────────────────────────────────────────────
+  const { data: journalList = [], isLoading: journalLoading } = useGetStudentJournal(userId);
+  const createJournal = useCreateJournalEntry(userId);
+  const deleteJournal = useDeleteJournalEntry(userId);
+  const [journalForm, setJournalForm] = useState({ date: "", topic: "", coveredSummary: "", nextSteps: "", parentNote: "" });
+  const [journalOpen, setJournalOpen] = useState(false);
+
+  // ── Materials state ────────────────────────────────────────────────────────
+  const { data: matList = [], isLoading: matLoading } = useGetStudentMaterials(userId);
+  const createMat = useCreateMaterial(userId);
+  const deleteMat = useDeleteMaterial(userId);
+  const [matForm, setMatForm] = useState({ title: "", url: "", type: "theory", topicTag: "" });
+  const [matOpen, setMatOpen] = useState(false);
+
+  // ── Roadmap state ──────────────────────────────────────────────────────────
+  const { data: roadmapList = [], isLoading: roadmapLoading } = useGetStudentRoadmap(userId);
+  const createRoadmap = useCreateRoadmapTopic(userId);
+  const updateRoadmap = useUpdateRoadmapTopic(userId);
+  const deleteRoadmap = useDeleteRoadmapTopic(userId);
+  const [roadmapForm, setRoadmapForm] = useState({ section: "Общее", title: "", status: "planned" });
+  const [roadmapOpen, setRoadmapOpen] = useState(false);
+
+  const handleEditNotes = () => {
     setForm({
-      roadmap: profile?.roadmap || "",
-      tutorNotes: profile?.tutorNotes || "",
-      homework: profile?.homework || "",
-      materials: profile?.materials || "",
-      lessonNotes: profile?.lessonNotes || "",
+      roadmap: profile?.roadmap || "", tutorNotes: profile?.tutorNotes || "",
+      homework: profile?.homework || "", materials: profile?.materials || "", lessonNotes: profile?.lessonNotes || "",
     });
     setEditing(true);
   };
 
-  const handleSave = async () => {
+  const handleSaveNotes = async () => {
     try {
       await updateProfile.mutateAsync(form);
       setEditing(false);
-      toast({ title: "Личное дело сохранено" });
+      toast({ title: "Заметки сохранены" });
     } catch {
       toast({ title: "Ошибка сохранения", variant: "destructive" });
     }
   };
 
-  if (editing) {
-    return (
-      <div className="space-y-3">
-        {[
-          { key: "roadmap", label: "🗺️ Учебный план" },
-          { key: "tutorNotes", label: "🔒 Заметки преподавателя (не видны ученику)" },
-          { key: "homework", label: "📝 Домашнее задание" },
-          { key: "materials", label: "📖 Материалы (ссылки, описание)" },
-          { key: "lessonNotes", label: "🗒️ Заметки по занятиям" },
-        ].map(({ key, label }) => (
-          <div key={key}>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">{label}</label>
-            <textarea
-              rows={3}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background"
-              value={(form as any)[key]}
-              onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-              placeholder={`Введите ${label.split(" ").slice(1).join(" ").toLowerCase()}...`}
-            />
-          </div>
-        ))}
-        <div className="flex gap-2 pt-1">
-          <Button size="sm" onClick={handleSave} disabled={updateProfile.isPending}>
-            {updateProfile.isPending ? "Сохранение..." : "Сохранить"}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Отмена</Button>
-        </div>
-      </div>
-    );
-  }
+  const hwStatusColor: Record<string, string> = {
+    assigned: "bg-amber-50 text-amber-700", submitted: "bg-blue-50 text-blue-700",
+    accepted: "bg-emerald-50 text-emerald-700", returned: "bg-red-50 text-red-700",
+  };
+  const hwStatusLabel: Record<string, string> = { assigned: "Задано", submitted: "Сдано", accepted: "Зачтено", returned: "На доработку" };
+  const matTypeLabel: Record<string, string> = { theory: "Теория", practice: "Практика", cheatsheet: "Шпаргалка", reference: "Справочник", video: "Видео" };
+  const roadStatusLabel: Record<string, string> = { planned: "Запл.", covered: "Пройдено", mastered: "Освоено" };
+  const roadStatusColor: Record<string, string> = {
+    planned: "bg-slate-100 text-slate-500", covered: "bg-blue-100 text-blue-700", mastered: "bg-emerald-100 text-emerald-700",
+  };
 
-  const hasContent = profile?.roadmap || profile?.tutorNotes || profile?.homework || profile?.materials || profile?.lessonNotes;
+  if (profileLoading) return <div className="py-6 text-center text-sm text-muted-foreground">Загрузка...</div>;
 
   return (
-    <div className="space-y-3">
-      {!hasContent ? (
-        <div className="py-8 text-center">
-          <p className="text-sm text-muted-foreground mb-3">Личное дело пустое</p>
-          <Button size="sm" onClick={handleEdit}>Заполнить</Button>
-        </div>
-      ) : (
-        <>
-          {[
-            { key: "roadmap", label: "🗺️ Учебный план", value: profile?.roadmap },
-            { key: "tutorNotes", label: "🔒 Заметки (только преп.)", value: profile?.tutorNotes },
-            { key: "homework", label: "📝 Домашнее задание", value: profile?.homework },
-            { key: "materials", label: "📖 Материалы", value: profile?.materials },
-            { key: "lessonNotes", label: "🗒️ Заметки по занятиям", value: profile?.lessonNotes },
-          ].filter(f => f.value).map(({ label, value }) => (
-            <div key={label} className="rounded-lg bg-muted/30 px-3 py-2">
-              <p className="text-xs font-semibold text-muted-foreground mb-1">{label}</p>
-              <p className="text-sm whitespace-pre-wrap">{value}</p>
+    <Tabs defaultValue="notes" className="w-full">
+      <TabsList className="w-full grid grid-cols-5 h-auto">
+        <TabsTrigger value="notes" className="text-xs px-1 py-1.5">Заметки</TabsTrigger>
+        <TabsTrigger value="hw" className="text-xs px-1 py-1.5 relative">
+          ДЗ
+          {(hwList as any[]).filter((h: any) => h.status === "submitted").length > 0 && (
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+              {(hwList as any[]).filter((h: any) => h.status === "submitted").length}
+            </span>
+          )}
+        </TabsTrigger>
+        <TabsTrigger value="journal" className="text-xs px-1 py-1.5">Журнал</TabsTrigger>
+        <TabsTrigger value="mats" className="text-xs px-1 py-1.5">Матер.</TabsTrigger>
+        <TabsTrigger value="roadmap" className="text-xs px-1 py-1.5">План</TabsTrigger>
+      </TabsList>
+
+      {/* ── Заметки Tab ── */}
+      <TabsContent value="notes" className="mt-3">
+        {editing ? (
+          <div className="space-y-3">
+            {[
+              { key: "roadmap", label: "🗺️ Учебный план" },
+              { key: "tutorNotes", label: "🔒 Заметки (не видны ученику)" },
+              { key: "homework", label: "📝 ДЗ (текст)" },
+              { key: "materials", label: "📖 Материалы (текст)" },
+              { key: "lessonNotes", label: "🗒️ Заметки по занятиям" },
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">{label}</label>
+                <textarea rows={2} className="w-full rounded-lg border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background"
+                  value={(form as any)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveNotes} disabled={updateProfile.isPending}>{updateProfile.isPending ? "Сохр..." : "Сохранить"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Отмена</Button>
             </div>
-          ))}
-          <Button size="sm" variant="outline" onClick={handleEdit} className="w-full">Редактировать</Button>
-        </>
-      )}
-    </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {[
+              { label: "🗺️ Учебный план", value: profile?.roadmap },
+              { label: "🔒 Заметки (преп.)", value: profile?.tutorNotes },
+              { label: "📝 ДЗ", value: profile?.homework },
+              { label: "📖 Материалы", value: profile?.materials },
+              { label: "🗒️ Занятия", value: profile?.lessonNotes },
+            ].filter(f => f.value).map(({ label, value }) => (
+              <div key={label} className="rounded-lg bg-muted/30 px-3 py-2">
+                <p className="text-xs font-semibold text-muted-foreground mb-1">{label}</p>
+                <p className="text-sm whitespace-pre-wrap">{value}</p>
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={handleEditNotes} className="w-full">
+              {!(profile?.roadmap || profile?.tutorNotes || profile?.homework || profile?.materials || profile?.lessonNotes) ? "Заполнить" : "Редактировать"}
+            </Button>
+          </div>
+        )}
+      </TabsContent>
+
+      {/* ── ДЗ Tab ── */}
+      <TabsContent value="hw" className="mt-3 space-y-3">
+        <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setHwOpen(!hwOpen)}>
+          {hwOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {hwOpen ? "Скрыть форму" : "Новое задание"}
+        </Button>
+        {hwOpen && (
+          <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/20">
+            <Input placeholder="Название задания *" value={hwForm.title} onChange={e => setHwForm(f => ({ ...f, title: e.target.value }))} className="text-sm" />
+            <textarea rows={2} placeholder="Описание, что нужно сделать..." value={hwForm.description}
+              onChange={e => setHwForm(f => ({ ...f, description: e.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background" />
+            <Input placeholder="Срок сдачи (ДД.ММ.ГГГГ)" value={hwForm.dueDate} onChange={e => setHwForm(f => ({ ...f, dueDate: e.target.value }))} className="text-sm" />
+            <Button size="sm" className="w-full" disabled={createHw.isPending} onClick={async () => {
+              if (!hwForm.title.trim()) { toast({ title: "Введите название", variant: "destructive" }); return; }
+              try {
+                await createHw.mutateAsync({ title: hwForm.title, description: hwForm.description || null, dueDate: hwForm.dueDate || null });
+                setHwForm({ title: "", description: "", dueDate: "" });
+                setHwOpen(false);
+                toast({ title: "Задание создано" });
+              } catch { toast({ title: "Ошибка", variant: "destructive" }); }
+            }}>
+              {createHw.isPending ? "Создание..." : "Создать"}
+            </Button>
+          </div>
+        )}
+        {hwLoading ? <div className="text-center text-sm text-muted-foreground py-4">Загрузка...</div> : (hwList as any[]).length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-6">Заданий нет</div>
+        ) : (hwList as any[]).map((hw: any) => (
+          <div key={hw.id} className="rounded-lg border border-border p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">{hw.title}</p>
+                {hw.dueDate && <p className="text-xs text-muted-foreground">До: {hw.dueDate}</p>}
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${hwStatusColor[hw.status] || "bg-muted text-muted-foreground"}`}>
+                  {hwStatusLabel[hw.status] || hw.status}
+                </span>
+                <button onClick={() => deleteHw.mutate({ id: hw.id })} className="text-muted-foreground hover:text-red-500 transition" title="Удалить">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+            {hw.description && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{hw.description}</p>}
+            {hw.submission && (
+              <div className="bg-blue-50 rounded-md px-2.5 py-2">
+                <p className="text-xs font-semibold text-blue-700 mb-1">Ответ ученика</p>
+                {hw.submission.text && <p className="text-xs text-blue-800 whitespace-pre-wrap">{hw.submission.text}</p>}
+                {hw.submission.linkUrl && (
+                  <a href={hw.submission.linkUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline break-all">
+                    🔗 {hw.submission.linkUrl}
+                  </a>
+                )}
+              </div>
+            )}
+            {hw.adminFeedback && (
+              <div className="bg-muted/40 rounded-md px-2.5 py-2">
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap">{hw.adminFeedback}</p>
+              </div>
+            )}
+            {hw.status === "submitted" && (
+              gradingId === hw.id ? (
+                <div className="space-y-2">
+                  <Select value={feedbackStatus} onValueChange={setFeedbackStatus}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="accepted">Зачесть</SelectItem>
+                      <SelectItem value="returned">Вернуть на доработку</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <textarea rows={2} placeholder="Комментарий (необязательно)" value={feedbackText}
+                    onChange={e => setFeedbackText(e.target.value)}
+                    className="w-full rounded-md border border-border px-2.5 py-1.5 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-primary/50 bg-background" />
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1 h-7 text-xs" disabled={updateHw.isPending} onClick={async () => {
+                      try {
+                        await updateHw.mutateAsync({ id: hw.id, data: { status: feedbackStatus, adminFeedback: feedbackText || null } });
+                        setGradingId(null); setFeedbackText("");
+                        toast({ title: feedbackStatus === "accepted" ? "Задание зачтено" : "Возвращено на доработку" });
+                      } catch { toast({ title: "Ошибка", variant: "destructive" }); }
+                    }}>{updateHw.isPending ? "..." : "Сохранить оценку"}</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setGradingId(null)}>Отмена</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => { setGradingId(hw.id); setFeedbackText(hw.adminFeedback || ""); setFeedbackStatus("accepted"); }}>
+                  <Check className="h-3 w-3 mr-1" /> Оценить работу
+                </Button>
+              )
+            )}
+            {hw.status !== "submitted" && hw.status !== "accepted" && hw.status !== "returned" && (
+              <Button size="sm" variant="ghost" className="w-full h-7 text-xs text-muted-foreground" onClick={() => updateHw.mutate({ id: hw.id, data: { status: "returned", adminFeedback: null } })}>
+                Изменить статус
+              </Button>
+            )}
+          </div>
+        ))}
+      </TabsContent>
+
+      {/* ── Журнал Tab ── */}
+      <TabsContent value="journal" className="mt-3 space-y-3">
+        <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setJournalOpen(!journalOpen)}>
+          {journalOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {journalOpen ? "Скрыть форму" : "Добавить занятие"}
+        </Button>
+        {journalOpen && (
+          <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/20">
+            <Input placeholder="Дата (ДД.ММ.ГГГГ) *" value={journalForm.date} onChange={e => setJournalForm(f => ({ ...f, date: e.target.value }))} className="text-sm" />
+            <Input placeholder="Тема занятия *" value={journalForm.topic} onChange={e => setJournalForm(f => ({ ...f, topic: e.target.value }))} className="text-sm" />
+            <textarea rows={2} placeholder="Что разобрали..." value={journalForm.coveredSummary}
+              onChange={e => setJournalForm(f => ({ ...f, coveredSummary: e.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background" />
+            <textarea rows={2} placeholder="Следующие шаги..." value={journalForm.nextSteps}
+              onChange={e => setJournalForm(f => ({ ...f, nextSteps: e.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background" />
+            <textarea rows={2} placeholder="Заметка для родителей (не видна ученику)..." value={journalForm.parentNote}
+              onChange={e => setJournalForm(f => ({ ...f, parentNote: e.target.value }))}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background" />
+            <Button size="sm" className="w-full" disabled={createJournal.isPending} onClick={async () => {
+              if (!journalForm.date.trim() || !journalForm.topic.trim()) { toast({ title: "Дата и тема обязательны", variant: "destructive" }); return; }
+              try {
+                await createJournal.mutateAsync({ date: journalForm.date, topic: journalForm.topic, coveredSummary: journalForm.coveredSummary || null, nextSteps: journalForm.nextSteps || null, parentNote: journalForm.parentNote || null });
+                setJournalForm({ date: "", topic: "", coveredSummary: "", nextSteps: "", parentNote: "" });
+                setJournalOpen(false);
+                toast({ title: "Запись добавлена" });
+              } catch { toast({ title: "Ошибка", variant: "destructive" }); }
+            }}>
+              {createJournal.isPending ? "Добавление..." : "Добавить"}
+            </Button>
+          </div>
+        )}
+        {journalLoading ? <div className="text-center text-sm text-muted-foreground py-4">Загрузка...</div> : (journalList as any[]).length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-6">Записей нет</div>
+        ) : (journalList as any[]).map((entry: any) => (
+          <div key={entry.id} className="rounded-lg border border-border p-3 space-y-1">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">{entry.topic}</p>
+                <p className="text-xs text-muted-foreground">{entry.date}</p>
+              </div>
+              <button onClick={() => deleteJournal.mutate({ id: entry.id })} className="text-muted-foreground hover:text-red-500 transition flex-shrink-0">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {entry.coveredSummary && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{entry.coveredSummary}</p>}
+            {entry.nextSteps && (
+              <div className="bg-primary/5 rounded px-2 py-1">
+                <p className="text-xs font-medium text-primary">→ {entry.nextSteps}</p>
+              </div>
+            )}
+            {entry.parentNote && (
+              <div className="bg-amber-50 rounded px-2 py-1">
+                <p className="text-xs text-amber-700">👨‍👩‍👦 {entry.parentNote}</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </TabsContent>
+
+      {/* ── Материалы Tab ── */}
+      <TabsContent value="mats" className="mt-3 space-y-3">
+        <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setMatOpen(!matOpen)}>
+          {matOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {matOpen ? "Скрыть форму" : "Добавить материал"}
+        </Button>
+        {matOpen && (
+          <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/20">
+            <Input placeholder="Название *" value={matForm.title} onChange={e => setMatForm(f => ({ ...f, title: e.target.value }))} className="text-sm" />
+            <Input placeholder="Ссылка (https://...) *" value={matForm.url} onChange={e => setMatForm(f => ({ ...f, url: e.target.value }))} className="text-sm" />
+            <Select value={matForm.type} onValueChange={v => setMatForm(f => ({ ...f, type: v }))}>
+              <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(matTypeLabel).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input placeholder="Тег темы (необязательно)" value={matForm.topicTag} onChange={e => setMatForm(f => ({ ...f, topicTag: e.target.value }))} className="text-sm" />
+            <Button size="sm" className="w-full" disabled={createMat.isPending} onClick={async () => {
+              if (!matForm.title.trim() || !matForm.url.trim()) { toast({ title: "Название и ссылка обязательны", variant: "destructive" }); return; }
+              try {
+                await createMat.mutateAsync({ title: matForm.title, url: matForm.url, type: matForm.type, topicTag: matForm.topicTag || null });
+                setMatForm({ title: "", url: "", type: "theory", topicTag: "" });
+                setMatOpen(false);
+                toast({ title: "Материал добавлен" });
+              } catch { toast({ title: "Ошибка", variant: "destructive" }); }
+            }}>
+              {createMat.isPending ? "Добавление..." : "Добавить"}
+            </Button>
+          </div>
+        )}
+        {matLoading ? <div className="text-center text-sm text-muted-foreground py-4">Загрузка...</div> : (matList as any[]).length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-6">Материалов нет</div>
+        ) : (matList as any[]).map((mat: any) => (
+          <div key={mat.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-sm font-medium truncate">{mat.title}</span>
+                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{matTypeLabel[mat.type] || mat.type}</span>
+              </div>
+              {mat.topicTag && <span className="text-xs text-muted-foreground"># {mat.topicTag}</span>}
+              <a href={mat.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block">{mat.url}</a>
+            </div>
+            <button onClick={() => deleteMat.mutate({ id: mat.id })} className="text-muted-foreground hover:text-red-500 transition flex-shrink-0">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </TabsContent>
+
+      {/* ── Учебный план Tab ── */}
+      <TabsContent value="roadmap" className="mt-3 space-y-3">
+        <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setRoadmapOpen(!roadmapOpen)}>
+          {roadmapOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {roadmapOpen ? "Скрыть форму" : "Добавить тему"}
+        </Button>
+        {roadmapOpen && (
+          <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/20">
+            <Input placeholder="Раздел (напр. Механика)" value={roadmapForm.section} onChange={e => setRoadmapForm(f => ({ ...f, section: e.target.value }))} className="text-sm" />
+            <Input placeholder="Тема *" value={roadmapForm.title} onChange={e => setRoadmapForm(f => ({ ...f, title: e.target.value }))} className="text-sm" />
+            <Select value={roadmapForm.status} onValueChange={v => setRoadmapForm(f => ({ ...f, status: v }))}>
+              <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="planned">Запланировано</SelectItem>
+                <SelectItem value="covered">Пройдено</SelectItem>
+                <SelectItem value="mastered">Освоено</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" className="w-full" disabled={createRoadmap.isPending} onClick={async () => {
+              if (!roadmapForm.title.trim()) { toast({ title: "Введите тему", variant: "destructive" }); return; }
+              try {
+                await createRoadmap.mutateAsync({ section: roadmapForm.section || "Общее", title: roadmapForm.title, status: roadmapForm.status });
+                setRoadmapForm({ section: "Общее", title: "", status: "planned" });
+                setRoadmapOpen(false);
+                toast({ title: "Тема добавлена" });
+              } catch { toast({ title: "Ошибка", variant: "destructive" }); }
+            }}>
+              {createRoadmap.isPending ? "Добавление..." : "Добавить"}
+            </Button>
+          </div>
+        )}
+        {roadmapLoading ? <div className="text-center text-sm text-muted-foreground py-4">Загрузка...</div> : (roadmapList as any[]).length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-6">Тем нет</div>
+        ) : (roadmapList as any[]).map((topic: any) => (
+          <div key={topic.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+            <Select value={topic.status} onValueChange={v => updateRoadmap.mutate({ id: topic.id, data: { status: v } })}>
+              <SelectTrigger className="h-6 w-24 text-xs border-0 bg-transparent p-0 focus:ring-0">
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${roadStatusColor[topic.status] || "bg-muted"}`}>
+                  {roadStatusLabel[topic.status] || topic.status}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="planned">Запланировано</SelectItem>
+                <SelectItem value="covered">Пройдено</SelectItem>
+                <SelectItem value="mastered">Освоено</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm truncate">{topic.title}</p>
+              {topic.section !== "Общее" && <p className="text-xs text-muted-foreground">{topic.section}</p>}
+            </div>
+            <button onClick={() => deleteRoadmap.mutate({ id: topic.id })} className="text-muted-foreground hover:text-red-500 transition flex-shrink-0">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </TabsContent>
+    </Tabs>
   );
 }
 

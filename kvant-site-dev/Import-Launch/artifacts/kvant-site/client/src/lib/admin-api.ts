@@ -239,3 +239,119 @@ export function useUpdateStudentProfile(userId: number | null) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "profile"] }),
   });
 }
+
+// ── Homework ──────────────────────────────────────────────────────────────────
+export function useGetStudentHomework(userId: number | null) {
+  return useQuery({
+    queryKey: ["/api/admin/users", userId, "homework"],
+    queryFn: () => adminFetch(`/api/admin/users/${userId}/homework`),
+    enabled: userId !== null,
+  });
+}
+
+export function useCreateHomework(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => adminFetch(`/api/admin/users/${userId}/homework`, { method: "POST", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "homework"] }),
+  });
+}
+
+export function useUpdateHomework(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => adminFetch(`/api/admin/homework/${id}`, { method: "PATCH", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "homework"] }),
+  });
+}
+
+export function useDeleteHomework(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/homework/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "homework"] }),
+  });
+}
+
+// ── Lesson Journal ────────────────────────────────────────────────────────────
+export function useGetStudentJournal(userId: number | null) {
+  return useQuery({
+    queryKey: ["/api/admin/users", userId, "journal"],
+    queryFn: () => adminFetch(`/api/admin/users/${userId}/journal`),
+    enabled: userId !== null,
+  });
+}
+
+export function useCreateJournalEntry(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => adminFetch(`/api/admin/users/${userId}/journal`, { method: "POST", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "journal"] }),
+  });
+}
+
+export function useDeleteJournalEntry(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/journal/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "journal"] }),
+  });
+}
+
+// ── Materials ─────────────────────────────────────────────────────────────────
+export function useGetStudentMaterials(userId: number | null) {
+  return useQuery({
+    queryKey: ["/api/admin/users", userId, "materials"],
+    queryFn: () => adminFetch(`/api/admin/users/${userId}/materials`),
+    enabled: userId !== null,
+  });
+}
+
+export function useCreateMaterial(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => adminFetch(`/api/admin/users/${userId}/materials`, { method: "POST", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "materials"] }),
+  });
+}
+
+export function useDeleteMaterial(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/materials/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "materials"] }),
+  });
+}
+
+// ── Roadmap ───────────────────────────────────────────────────────────────────
+export function useGetStudentRoadmap(userId: number | null) {
+  return useQuery({
+    queryKey: ["/api/admin/users", userId, "roadmap"],
+    queryFn: () => adminFetch(`/api/admin/users/${userId}/roadmap`),
+    enabled: userId !== null,
+  });
+}
+
+export function useCreateRoadmapTopic(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => adminFetch(`/api/admin/users/${userId}/roadmap`, { method: "POST", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "roadmap"] }),
+  });
+}
+
+export function useUpdateRoadmapTopic(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => adminFetch(`/api/admin/roadmap/${id}`, { method: "PATCH", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "roadmap"] }),
+  });
+}
+
+export function useDeleteRoadmapTopic(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => adminFetch(`/api/admin/roadmap/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/users", userId, "roadmap"] }),
+  });
+}

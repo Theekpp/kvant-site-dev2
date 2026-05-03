@@ -162,6 +162,59 @@ export const studentProfiles = pgTable("student_profiles", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+export const homeworkAssignments = pgTable("homework_assignments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  bookingId: integer("booking_id").references(() => bookings.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  dueDate: text("due_date"),
+  status: text("status").notNull().default("assigned"),
+  adminFeedback: text("admin_feedback"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const homeworkSubmissions = pgTable("homework_submissions", {
+  id: serial("id").primaryKey(),
+  homeworkId: integer("homework_id").notNull().references(() => homeworkAssignments.id, { onDelete: "cascade" }),
+  text: text("text"),
+  linkUrl: text("link_url"),
+  submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
+});
+
+export const lessonJournalEntries = pgTable("lesson_journal_entries", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  bookingId: integer("booking_id").references(() => bookings.id, { onDelete: "set null" }),
+  date: text("date").notNull(),
+  topic: text("topic").notNull(),
+  coveredSummary: text("covered_summary"),
+  nextSteps: text("next_steps"),
+  parentNote: text("parent_note"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const studentMaterials = pgTable("student_materials", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  type: text("type").notNull().default("theory"),
+  topicTag: text("topic_tag"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const roadmapTopics = pgTable("roadmap_topics", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  section: text("section").notNull().default("Общее"),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("planned"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;

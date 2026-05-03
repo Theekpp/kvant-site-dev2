@@ -172,6 +172,22 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel?: (id: n
   );
 }
 
+type CabFileSubTab = "overview" | "homework" | "journal" | "materials" | "roadmap";
+interface HwItem {
+  id: number; userId: number; title: string; description: string | null; dueDate: string | null;
+  status: string; adminFeedback: string | null; createdAt: string;
+  submission: { id: number; text: string | null; linkUrl: string | null; submittedAt: string } | null;
+}
+interface JournalEntry {
+  id: number; date: string; topic: string; coveredSummary: string | null; nextSteps: string | null; createdAt: string;
+}
+interface MaterialItem {
+  id: number; title: string; url: string; type: string; topicTag: string | null; createdAt: string;
+}
+interface RoadmapTopic {
+  id: number; section: string; title: string; status: string; sortOrder: number; createdAt: string;
+}
+
 export default function Cabinet() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -213,6 +229,18 @@ export default function Cabinet() {
   const [telegramLinked, setTelegramLinked] = useState<{ linked: boolean; telegramUsername?: string | null } | null>(null);
   const [telegramLinkToken, setTelegramLinkToken] = useState<{ token: string; expiresAt: string } | null>(null);
   const [telegramLinkLoading, setTelegramLinkLoading] = useState(false);
+
+  const [fileSubTab, setFileSubTab] = useState<CabFileSubTab>("overview");
+  const [hwList, setHwList] = useState<HwItem[]>([]);
+  const [journalList, setJournalList] = useState<JournalEntry[]>([]);
+  const [materialsList, setMaterialsList] = useState<MaterialItem[]>([]);
+  const [roadmapList, setRoadmapList] = useState<RoadmapTopic[]>([]);
+  const [fileDataLoaded, setFileDataLoaded] = useState(false);
+  const [fileDataLoading, setFileDataLoading] = useState(false);
+  const [submitHwId, setSubmitHwId] = useState<number | null>(null);
+  const [submitText, setSubmitText] = useState("");
+  const [submitLink, setSubmitLink] = useState("");
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   const totalOrderItems = Object.values(orderCart).reduce((a, b) => a + b, 0);
 
@@ -393,6 +421,41 @@ export default function Cabinet() {
       setEditError(err.response?.data?.message || "Ошибка сохранения");
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "file" && !fileDataLoaded && !fileDataLoading) {
+      setFileDataLoading(true);
+      Promise.all([
+        api.get("/api/cabinet/homework").then(r => setHwList(Array.isArray(r.data) ? r.data : [])).catch(() => {}),
+        api.get("/api/cabinet/journal").then(r => setJournalList(Array.isArray(r.data) ? r.data : [])).catch(() => {}),
+        api.get("/api/cabinet/materials").then(r => setMaterialsList(Array.isArray(r.data) ? r.data : [])).catch(() => {}),
+        api.get("/api/cabinet/roadmap").then(r => setRoadmapList(Array.isArray(r.data) ? r.data : [])).catch(() => {}),
+      ]).finally(() => { setFileDataLoaded(true); setFileDataLoading(false); });
+    }
+  }, [activeTab, fileDataLoaded, fileDataLoading]);
+
+  const handleHwSubmit = async (hwId: number) => {
+    if (!submitText.trim() && !submitLink.trim()) {
+      toast({ title: "Добавьте ответ или ссылку", variant: "destructive" });
+      return;
+    }
+    setSubmitLoading(true);
+    try {
+      await api.post(`/api/cabinet/homework/${hwId}/submit`, { text: submitText || null, linkUrl: submitLink || null });
+      setHwList(prev => prev.map(hw => hw.id === hwId
+        ? { ...hw, status: "submitted", submission: { id: 0, text: submitText || null, linkUrl: submitLink || null, submittedAt: new Date().toISOString() } }
+        : hw
+      ));
+      setSubmitHwId(null);
+      setSubmitText("");
+      setSubmitLink("");
+      toast({ title: "Домашнее задание отправлено!" });
+    } catch {
+      toast({ title: "Ошибка отправки", variant: "destructive" });
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -1201,64 +1264,395 @@ export default function Cabinet() {
         )}
 
         {/* ── FILE (Личное дело) ── */}
-        {activeTab === "file" && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Личное дело</h2>
-              <p className="text-slate-400 text-sm mt-1">Ваш учебный план и материалы от преподавателя</p>
-            </div>
+        {activeTab === "file" && (() => {
+          const hwStatusLabel: Record<string, string> = { assigned: "Задано", submitted: "Сдано", accepted: "Зачтено", returned: "На доработку" };
+          const hwStatusColor: Record<string, string> = {
+            assigned: "bg-amber-50 text-amber-700 border-amber-200",
+            submitted: "bg-blue-50 text-blue-700 border-blue-200",
+            accepted: "bg-emerald-50 text-emerald-700 border-emerald-200",
+            returned: "bg-red-50 text-red-700 border-red-200",
+          };
+          const matTypeLabel: Record<string, string> = { theory: "Теория", practice: "Практика", cheatsheet: "Шпаргалка", reference: "Справочник", video: "Видео" };
+          const matTypeColor: Record<string, string> = {
+            theory: "bg-indigo-50 text-indigo-700", practice: "bg-emerald-50 text-emerald-700",
+            cheatsheet: "bg-amber-50 text-amber-700", reference: "bg-violet-50 text-violet-700", video: "bg-rose-50 text-rose-700",
+          };
+          const roadStatusColor: Record<string, string> = {
+            planned: "bg-slate-100 text-slate-500",
+            covered: "bg-blue-100 text-blue-700",
+            mastered: "bg-emerald-100 text-emerald-700",
+          };
+          const roadStatusLabel: Record<string, string> = { planned: "Запланировано", covered: "Пройдено", mastered: "Освоено" };
 
-            {!studentProfile ? (
-              <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
-                <p className="text-4xl mb-3">📚</p>
-                <p className="text-slate-500 font-semibold">Личное дело ещё не заполнено</p>
-                <p className="text-slate-400 text-sm mt-1">Преподаватель добавит учебный план и материалы после первого занятия</p>
+          const openHwCount = hwList.filter(h => h.status === "assigned" || h.status === "returned").length;
+
+          const subTabs: { id: FileSubTab; label: string; badge?: number }[] = [
+            { id: "overview", label: "Обзор" },
+            { id: "homework", label: "ДЗ", badge: openHwCount || undefined },
+            { id: "journal", label: "Занятия" },
+            { id: "materials", label: "Материалы" },
+            { id: "roadmap", label: "Учебный план" },
+          ];
+
+          return (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Личное дело</h2>
+                <p className="text-slate-400 text-sm mt-1">Задания, журнал занятий и материалы от преподавателя</p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {studentProfile.roadmap && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-lg">🗺️</span> Учебный план
-                    </h3>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.roadmap}</p>
-                  </div>
-                )}
-                {studentProfile.homework && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-lg">📝</span> Домашнее задание
-                    </h3>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.homework}</p>
-                  </div>
-                )}
-                {studentProfile.materials && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-lg">📖</span> Материалы
-                    </h3>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.materials}</p>
-                  </div>
-                )}
-                {studentProfile.lessonNotes && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-lg">🗒️</span> Заметки по занятиям
-                    </h3>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.lessonNotes}</p>
-                  </div>
-                )}
-                {!studentProfile.roadmap && !studentProfile.homework && !studentProfile.materials && !studentProfile.lessonNotes && (
-                  <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
-                    <p className="text-4xl mb-3">📚</p>
-                    <p className="text-slate-500 font-semibold">Личное дело создано, но пока пусто</p>
-                    <p className="text-slate-400 text-sm mt-1">Преподаватель скоро добавит материалы</p>
-                  </div>
-                )}
+
+              {/* Sub-tab navigation */}
+              <div className="flex gap-1 bg-white rounded-xl border border-slate-200 p-1 overflow-x-auto shadow-sm">
+                {subTabs.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setFileSubTab(t.id)}
+                    className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                      fileSubTab === t.id
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                    }`}
+                  >
+                    {t.label}
+                    {t.badge ? (
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${fileSubTab === t.id ? "bg-white/30 text-white" : "bg-amber-100 text-amber-700"}`}>
+                        {t.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
-        )}
+
+              {fileDataLoading && (
+                <div className="py-10 flex justify-center">
+                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+
+              {!fileDataLoading && fileSubTab === "overview" && (
+                <div className="space-y-4">
+                  {/* Stats row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className={`rounded-2xl p-4 text-center ${openHwCount > 0 ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white" : "bg-white border border-slate-100"}`}>
+                      <div className={`text-2xl font-black ${openHwCount === 0 ? "text-slate-800" : ""}`}>{openHwCount}</div>
+                      <div className={`text-xs mt-0.5 ${openHwCount > 0 ? "text-white/80" : "text-slate-400"}`}>Открытых ДЗ</div>
+                    </div>
+                    <div className="rounded-2xl p-4 text-center bg-white border border-slate-100">
+                      <div className="text-2xl font-black text-slate-800">{hwList.filter(h => h.status === "accepted").length}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">ДЗ зачтено</div>
+                    </div>
+                    <div className="rounded-2xl p-4 text-center bg-white border border-slate-100">
+                      <div className="text-2xl font-black text-slate-800">{journalList.length}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">Занятий в журнале</div>
+                    </div>
+                    <div className={`rounded-2xl p-4 text-center ${roadmapList.filter(r => r.status === "mastered").length > 0 ? "bg-gradient-to-br from-emerald-400 to-teal-500 text-white" : "bg-white border border-slate-100"}`}>
+                      <div className={`text-2xl font-black ${roadmapList.filter(r => r.status === "mastered").length === 0 ? "text-slate-800" : ""}`}>
+                        {roadmapList.filter(r => r.status === "mastered").length}
+                      </div>
+                      <div className={`text-xs mt-0.5 ${roadmapList.filter(r => r.status === "mastered").length > 0 ? "text-white/80" : "text-slate-400"}`}>Тем освоено</div>
+                    </div>
+                  </div>
+
+                  {/* Open homework */}
+                  {openHwCount > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                      <p className="font-semibold text-amber-800 text-sm mb-2">📝 Открытые домашние задания</p>
+                      <div className="space-y-2">
+                        {hwList.filter(h => h.status === "assigned" || h.status === "returned").map(hw => (
+                          <div key={hw.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-800 truncate">{hw.title}</p>
+                              {hw.dueDate && <p className="text-xs text-slate-400">До: {hw.dueDate}</p>}
+                            </div>
+                            <button
+                              onClick={() => { setFileSubTab("homework"); setSubmitHwId(hw.id); setSubmitText(""); setSubmitLink(""); }}
+                              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition whitespace-nowrap"
+                            >
+                              Сдать
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Last lesson */}
+                  {journalList.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Последнее занятие</p>
+                      <div>
+                        <p className="font-semibold text-slate-800">{journalList[0].topic}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{journalList[0].date}</p>
+                        {journalList[0].coveredSummary && (
+                          <p className="text-sm text-slate-600 mt-2 leading-relaxed">{journalList[0].coveredSummary}</p>
+                        )}
+                        {journalList[0].nextSteps && (
+                          <div className="mt-2 bg-indigo-50 rounded-lg px-3 py-2">
+                            <p className="text-xs font-semibold text-indigo-700 mb-0.5">Что делать дальше</p>
+                            <p className="text-sm text-indigo-800 leading-relaxed">{journalList[0].nextSteps}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {hwList.length === 0 && journalList.length === 0 && materialsList.length === 0 && roadmapList.length === 0 && (
+                    <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                      <p className="text-4xl mb-3">📚</p>
+                      <p className="text-slate-500 font-semibold">Личное дело пустое</p>
+                      <p className="text-slate-400 text-sm mt-1">Преподаватель добавит материалы после первого занятия</p>
+                    </div>
+                  )}
+
+                  {/* Legacy plain text fields */}
+                  {(studentProfile?.roadmap || studentProfile?.homework || studentProfile?.materials || studentProfile?.lessonNotes) && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Заметки преподавателя</p>
+                      {studentProfile?.roadmap && (
+                        <div className="bg-white rounded-xl border border-slate-100 p-4">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">🗺️ Учебный план</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.roadmap}</p>
+                        </div>
+                      )}
+                      {studentProfile?.homework && (
+                        <div className="bg-white rounded-xl border border-slate-100 p-4">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">📝 Домашнее задание</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.homework}</p>
+                        </div>
+                      )}
+                      {studentProfile?.materials && (
+                        <div className="bg-white rounded-xl border border-slate-100 p-4">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">📖 Материалы</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.materials}</p>
+                        </div>
+                      )}
+                      {studentProfile?.lessonNotes && (
+                        <div className="bg-white rounded-xl border border-slate-100 p-4">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">🗒️ Заметки по занятиям</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{studentProfile.lessonNotes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!fileDataLoading && fileSubTab === "homework" && (
+                <div className="space-y-3">
+                  {hwList.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                      <p className="text-3xl mb-2">📝</p>
+                      <p className="text-slate-500 text-sm font-medium">Домашних заданий пока нет</p>
+                    </div>
+                  ) : hwList.map(hw => (
+                    <div key={hw.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800">{hw.title}</p>
+                          {hw.dueDate && <p className="text-xs text-slate-400 mt-0.5">До: {hw.dueDate}</p>}
+                        </div>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border whitespace-nowrap flex-shrink-0 ${hwStatusColor[hw.status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                          {hwStatusLabel[hw.status] || hw.status}
+                        </span>
+                      </div>
+                      {hw.description && (
+                        <p className="text-sm text-slate-600 leading-relaxed mb-3 whitespace-pre-wrap">{hw.description}</p>
+                      )}
+                      {hw.adminFeedback && (
+                        <div className={`rounded-xl px-3 py-2 mb-3 ${hw.status === "returned" ? "bg-red-50 border border-red-100" : "bg-emerald-50 border border-emerald-100"}`}>
+                          <p className={`text-xs font-semibold mb-0.5 ${hw.status === "returned" ? "text-red-700" : "text-emerald-700"}`}>
+                            {hw.status === "returned" ? "Комментарий преподавателя" : "Оценка преподавателя"}
+                          </p>
+                          <p className={`text-sm leading-relaxed ${hw.status === "returned" ? "text-red-800" : "text-emerald-800"}`}>{hw.adminFeedback}</p>
+                        </div>
+                      )}
+                      {hw.submission && hw.status !== "assigned" && (
+                        <div className="bg-slate-50 rounded-xl px-3 py-2 mb-3">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">Ваш ответ</p>
+                          {hw.submission.text && <p className="text-sm text-slate-700 whitespace-pre-wrap">{hw.submission.text}</p>}
+                          {hw.submission.linkUrl && (
+                            <a href={hw.submission.linkUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mt-1">
+                              🔗 {hw.submission.linkUrl}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                      {(hw.status === "assigned" || hw.status === "returned") && (
+                        submitHwId === hw.id ? (
+                          <div className="space-y-2 mt-2">
+                            <textarea
+                              rows={3}
+                              value={submitText}
+                              onChange={e => setSubmitText(e.target.value)}
+                              placeholder="Введите ответ, решение или описание..."
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                            />
+                            <input
+                              type="url"
+                              value={submitLink}
+                              onChange={e => setSubmitLink(e.target.value)}
+                              placeholder="Ссылка на решение (Google Drive, фото и т.д.)"
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleHwSubmit(hw.id)}
+                                disabled={submitLoading}
+                                className="flex-1 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition disabled:opacity-60"
+                              >
+                                {submitLoading ? "Отправка..." : "Отправить"}
+                              </button>
+                              <button
+                                onClick={() => { setSubmitHwId(null); setSubmitText(""); setSubmitLink(""); }}
+                                className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-xl hover:bg-slate-50 transition"
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setSubmitHwId(hw.id); setSubmitText(hw.submission?.text || ""); setSubmitLink(hw.submission?.linkUrl || ""); }}
+                            className="w-full py-2 border border-indigo-200 text-indigo-600 text-sm font-semibold rounded-xl hover:bg-indigo-50 transition"
+                          >
+                            {hw.status === "returned" ? "Переотправить" : "Сдать задание"}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!fileDataLoading && fileSubTab === "journal" && (
+                <div className="space-y-3">
+                  {journalList.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                      <p className="text-3xl mb-2">📖</p>
+                      <p className="text-slate-500 text-sm font-medium">Журнал занятий пустой</p>
+                      <p className="text-slate-400 text-xs mt-1">Преподаватель добавит записи после занятий</p>
+                    </div>
+                  ) : journalList.map((entry, idx) => (
+                    <div key={entry.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 relative">
+                      {idx === 0 && (
+                        <span className="absolute top-4 right-4 text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                          Последнее
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-slate-800">{entry.topic}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mb-3">{entry.date}</p>
+                      {entry.coveredSummary && (
+                        <p className="text-sm text-slate-600 leading-relaxed mb-2 whitespace-pre-wrap">{entry.coveredSummary}</p>
+                      )}
+                      {entry.nextSteps && (
+                        <div className="bg-indigo-50 rounded-xl px-3 py-2">
+                          <p className="text-xs font-semibold text-indigo-700 mb-0.5">Следующие шаги</p>
+                          <p className="text-sm text-indigo-800 leading-relaxed whitespace-pre-wrap">{entry.nextSteps}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!fileDataLoading && fileSubTab === "materials" && (
+                <div className="space-y-3">
+                  {materialsList.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                      <p className="text-3xl mb-2">📂</p>
+                      <p className="text-slate-500 text-sm font-medium">Материалов пока нет</p>
+                      <p className="text-slate-400 text-xs mt-1">Преподаватель добавит ссылки на материалы</p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {materialsList.map(mat => (
+                        <a
+                          key={mat.id}
+                          href={mat.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 hover:border-indigo-300 hover:shadow-md transition-all group flex flex-col gap-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-slate-800 text-sm group-hover:text-indigo-700 transition leading-tight">{mat.title}</span>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${matTypeColor[mat.type] || "bg-slate-100 text-slate-600"}`}>
+                              {matTypeLabel[mat.type] || mat.type}
+                            </span>
+                          </div>
+                          {mat.topicTag && (
+                            <span className="text-xs text-slate-400"># {mat.topicTag}</span>
+                          )}
+                          <span className="text-xs text-indigo-500 group-hover:text-indigo-700 transition truncate">{mat.url}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!fileDataLoading && fileSubTab === "roadmap" && (() => {
+                const grouped: Record<string, typeof roadmapList> = {};
+                roadmapList.forEach(t => {
+                  if (!grouped[t.section]) grouped[t.section] = [];
+                  grouped[t.section].push(t);
+                });
+                const sections = Object.keys(grouped);
+                const masteredCount = roadmapList.filter(t => t.status === "mastered").length;
+                const coveredCount = roadmapList.filter(t => t.status === "covered").length;
+                const total = roadmapList.length;
+                return (
+                  <div className="space-y-4">
+                    {total > 0 && (
+                      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Прогресс</span>
+                          <span className="text-xs font-bold text-slate-700">{masteredCount + coveredCount} / {total}</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all"
+                            style={{ width: `${total > 0 ? Math.round(((masteredCount + coveredCount) / total) * 100) : 0}%` }} />
+                        </div>
+                        <div className="flex gap-4 mt-2">
+                          <span className="text-xs text-emerald-600">● Освоено: {masteredCount}</span>
+                          <span className="text-xs text-blue-600">● Пройдено: {coveredCount}</span>
+                          <span className="text-xs text-slate-400">● Запланировано: {roadmapList.filter(t => t.status === "planned").length}</span>
+                        </div>
+                      </div>
+                    )}
+                    {sections.length === 0 ? (
+                      <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                        <p className="text-3xl mb-2">🗺️</p>
+                        <p className="text-slate-500 text-sm font-medium">Учебный план пустой</p>
+                        <p className="text-slate-400 text-xs mt-1">Преподаватель составит план после первого занятия</p>
+                      </div>
+                    ) : sections.map(sec => (
+                      <div key={sec} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{sec}</p>
+                        <div className="space-y-2">
+                          {grouped[sec].map(topic => (
+                            <div key={topic.id} className="flex items-center gap-3">
+                              <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${roadStatusColor[topic.status] || "bg-slate-100 text-slate-500"}`}>
+                                {roadStatusLabel[topic.status] || topic.status}
+                              </span>
+                              <span className={`text-sm flex-1 ${topic.status === "mastered" ? "font-semibold text-slate-800" : topic.status === "covered" ? "text-slate-700" : "text-slate-500"}`}>
+                                {topic.title}
+                              </span>
+                              {topic.status === "mastered" && <span className="text-emerald-500 text-sm">✓</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          );
+        })()}
 
         {/* ── PROFILE ── */}
         {activeTab === "profile" && (
