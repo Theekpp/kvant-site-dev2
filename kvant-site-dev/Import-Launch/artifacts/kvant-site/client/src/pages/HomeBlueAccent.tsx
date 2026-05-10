@@ -11,7 +11,7 @@ import { tryRefreshToken, getAccessToken, getMe } from "@/lib/auth";
 
 // Asset imports
 import aboutImage from "@assets/image_1771364502291.png";
-import kvantLogo from "@assets/image_1775753659602.png";
+import kvantLogo from "@assets/png_test_1778406809373.png";
 
 const JSON_LD_SCHEMA = {
   "@context": "https://schema.org",
@@ -150,18 +150,14 @@ export default function HomeBlueAccent() {
           className="container mx-auto px-4 flex items-center justify-between max-w-7xl"
           style={{ height: 'clamp(80px, calc(2.9vw + 57px), 112px)' }}
         >
-          <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
+          <div className="flex items-center cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
             <img
               src={kvantLogo}
               alt="Физика с Кириллом — логотип"
               className="object-contain"
               loading="eager"
-              style={{ width: 'clamp(40px, calc(1.5vw + 28px), 56px)', height: 'clamp(40px, calc(1.5vw + 28px), 56px)' }}
+              style={{ height: 'clamp(48px, calc(2vw + 36px), 72px)', width: 'auto' }}
             />
-            <span
-              className="font-display font-bold text-slate-800 -ml-0.5"
-              style={{ fontSize: 'clamp(1.5rem, calc(1vw + 1rem), 2.25rem)' }}
-            >vant</span>
           </div>
 
           {/* Desktop Nav */}
@@ -804,8 +800,7 @@ export default function HomeBlueAccent() {
           <div className="mt-20 pt-10 border-t border-slate-800 text-sm text-slate-400 space-y-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
-                <img src={kvantLogo} alt="Физика с Кириллом" className="w-6 h-6 object-contain opacity-80" loading="lazy" />
-                <span className="font-display font-bold text-slate-200">vant</span>
+                <img src={kvantLogo} alt="Физика с Кириллом" className="h-9 w-auto object-contain opacity-90" loading="lazy" />
               </div>
               <div>© {new Date().getFullYear()} Kvant. Все права защищены.</div>
               <div className="flex gap-4">

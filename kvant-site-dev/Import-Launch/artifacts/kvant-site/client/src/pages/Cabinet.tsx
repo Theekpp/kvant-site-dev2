@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { BookingCalendar } from "@/components/BookingCalendar";
 import { startOfDay, startOfWeekMon } from "@/lib/date-utils";
-import kvantLogo from "@assets/image_1775753659602.png";
+import kvantLogo from "@assets/png_test_1778406809373.png";
 
 interface Account {
   id: number;
@@ -571,8 +571,7 @@ export default function Cabinet() {
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-1.5 group">
-              <img src={kvantLogo} alt="K" className="w-9 h-9 object-contain" />
-              <span className="font-bold text-xl text-slate-800 -ml-0.5 group-hover:text-indigo-600 transition-colors">vant</span>
+              <img src={kvantLogo} alt="Kvant" className="h-10 w-auto object-contain" />
             </a>
             <a href="/" className="hidden md:flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-600 transition border border-slate-200 hover:border-indigo-300 rounded-lg px-2.5 py-1">
               ← На сайт
