@@ -182,7 +182,17 @@ async function main() {
   });
 
   if (isDev) {
-    // Vite middleware in dev
+    // Open the port immediately so Replit health-checks pass, then mount
+    // Vite middleware async (it can take several seconds to compile).
+    await new Promise<void>((resolve) => {
+      httpServer.listen(PORT, HOST, () => {
+        log(`listening on http://${HOST}:${PORT}`);
+        resolve();
+      });
+    });
+
+    // Initialise Vite dev server in the background — requests arriving
+    // before Vite is ready will get a brief "loading" response.
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: { server: httpServer } },
@@ -204,11 +214,11 @@ async function main() {
       res.sendFile(path.join(distDir, "index.html"));
     });
     log("serving static build");
-  }
 
-  httpServer.listen(PORT, HOST, () => {
-    log(`listening on http://${HOST}:${PORT}`);
-  });
+    httpServer.listen(PORT, HOST, () => {
+      log(`listening on http://${HOST}:${PORT}`);
+    });
+  }
 }
 
 main().catch((err) => {

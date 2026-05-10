@@ -112,6 +112,14 @@ outputType = "console"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 8082
+externalPort = 3001
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
 [deployment]
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "cd kvant-site-dev/Import-Launch/artifacts/kvant-site && pnpm run start"]

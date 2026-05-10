@@ -209,6 +209,12 @@ export default function App() {
         onPointerUpdate={handlePointerUpdate}
         viewModeEnabled={readOnly}
         langCode="ru-RU"
+        initialData={{
+          appState: {
+            gridModeEnabled: true,
+            gridSize: 20,
+          },
+        }}
         UIOptions={{
           canvasActions: {
             loadScene: false,
