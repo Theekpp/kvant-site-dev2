@@ -58,6 +58,7 @@ export const bookings = pgTable("bookings", {
   paymentMethod: text("payment_method"),
   groupScheduleId: integer("group_schedule_id"),
   roomId: text("room_id").unique(),
+  comment: text("comment"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 

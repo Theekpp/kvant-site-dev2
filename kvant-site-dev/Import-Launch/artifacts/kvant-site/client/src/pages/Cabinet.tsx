@@ -206,6 +206,8 @@ export default function Cabinet() {
 
   const [bookingSlot, setBookingSlot] = useState<ScheduleSlot | null>(null);
   const [bookingDate, setBookingDate] = useState("");
+  const [bookingComment, setBookingComment] = useState("");
+  const [bookingCommentError, setBookingCommentError] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingType, setBookingType] = useState<"individual" | "group">("individual");
@@ -486,6 +488,12 @@ export default function Cabinet() {
 
   const handleBookSlot = async () => {
     if (!bookingSlot) return;
+    const isFirstBooking = bookings.filter(b => b.status !== "cancelled").length === 0;
+    if (isFirstBooking && !bookingComment.trim()) {
+      setBookingCommentError("Для первого занятия комментарий обязателен");
+      return;
+    }
+    setBookingCommentError("");
     setBookingLoading(true);
     try {
       const date = bookingDate || bookingSlot.specificDate;
@@ -499,12 +507,15 @@ export default function Cabinet() {
         date,
         time: bookingSlot.time,
         groupScheduleId: bookingSlot.slotType === "group" ? bookingSlot.id : undefined,
+        comment: bookingComment.trim() || undefined,
       });
       // Optimistic insert for instant feedback
       setBookings(prev => [newBooking.data, ...prev]);
       setBookingSuccess(true);
       setBookingSlot(null);
       setBookingDate("");
+      setBookingComment("");
+      setBookingCommentError("");
       setTimeout(() => setBookingSuccess(false), 3000);
       // Re-sync with server (subscription remainingLessons has been deducted)
       await refreshCabinet();
@@ -1102,6 +1113,32 @@ export default function Cabinet() {
                       </span>
                     </div>
                   </div>
+                  {(() => {
+                    const isFirstBooking = bookings.filter(b => b.status !== "cancelled").length === 0;
+                    return (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          {isFirstBooking ? (
+                            <>Комментарий <span className="text-red-500">*</span></>
+                          ) : (
+                            "Комментарий к занятию"
+                          )}
+                        </label>
+                        <textarea
+                          value={bookingComment}
+                          onChange={e => { setBookingComment(e.target.value); setBookingCommentError(""); }}
+                          placeholder={isFirstBooking
+                            ? "Расскажите о своих целях — преподавателю важно понять ваш запрос"
+                            : "Необязательно — например, тема, вопросы или пожелания к занятию"}
+                          rows={3}
+                          className={`w-full text-sm rounded-xl border px-3 py-2.5 resize-none focus:outline-none focus:ring-2 transition ${bookingCommentError ? "border-red-400 focus:ring-red-300" : "border-slate-200 focus:ring-indigo-300"}`}
+                        />
+                        {bookingCommentError && (
+                          <p className="mt-1 text-xs text-red-500">{bookingCommentError}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="flex gap-2">
                     <button
                       onClick={handleBookSlot}
@@ -1110,7 +1147,7 @@ export default function Cabinet() {
                     >
                       {bookingLoading ? "Записываемся..." : "Записаться"}
                     </button>
-                    <button onClick={() => setBookingSlot(null)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
+                    <button onClick={() => { setBookingSlot(null); setBookingComment(""); setBookingCommentError(""); }} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
                       Отмена
                     </button>
                   </div>

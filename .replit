@@ -25,13 +25,13 @@ outputType = "webview"
 name = "Telegram Bot"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd kvant-bot && pnpm install --no-frozen-lockfile && PORT=8099 NODE_ENV=development node_modules/.bin/tsx server/index.ts"
-waitForPort = 8099
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd kvant-bot && pnpm install --no-frozen-lockfile --prefer-offline && PORT=8099 NODE_ENV=development node_modules/.bin/tsx server/index.ts"
+waitForPort = 8099
 
 [[workflows.workflow]]
 name = "kvant-site-dev/Import-Launch/artifacts/api-server: API Server"
@@ -84,6 +84,10 @@ args = "Excalidraw Board"
 task = "workflow.run"
 args = "LiveKit Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Telegram Bot"
+
 [[workflows.workflow]]
 name = "Excalidraw Board"
 author = "agent"
@@ -119,6 +123,10 @@ externalPort = 8000
 [[ports]]
 localPort = 8082
 externalPort = 3001
+
+[[ports]]
+localPort = 8099
+externalPort = 8099
 
 [deployment]
 deploymentTarget = "autoscale"

@@ -109,6 +109,7 @@ async function notifyAdminNewBooking(
     ? `${studentUser.firstName || ""} ${studentUser.lastName || ""}`.trim() || "Без имени"
     : "Без имени";
   const typeText = booking.type === "individual" ? "Индивидуальное" : "Групповое";
+  const commentLine = booking.comment ? `💬 Комментарий: ${booking.comment}\n` : "";
 
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -122,6 +123,7 @@ async function notifyAdminNewBooking(
           `📱 ${studentUser?.phone || "телефон не указан"}\n` +
           `📚 ${typeText} занятие\n` +
           `📅 ${booking.date} в ${booking.time}\n` +
+          commentLine +
           `🆔 Запись #${booking.id}`,
         reply_markup: JSON.stringify({
           inline_keyboard: [[
@@ -532,7 +534,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   app.post("/api/cabinet/bookings", requireAuth, async (req, res) => {
-    const { type, date, time, groupScheduleId } = req.body;
+    const { type, date, time, groupScheduleId, comment } = req.body;
     try {
       if (!type || !date || !time) {
         return res.status(400).json({ message: "Не хватает данных для записи" });
@@ -558,6 +560,22 @@ export function registerAuthRoutes(app: Express) {
         .where(eq(accounts.id, req.accountId!));
       if (!account?.userId) {
         return res.status(400).json({ message: "Аккаунт не привязан к пользователю" });
+      }
+
+      // Check if this is the student's first booking
+      const existingBookings = await db.select({ id: bookings.id })
+        .from(bookings)
+        .where(and(
+          eq(bookings.userId, account.userId),
+          ne(bookings.status, "cancelled"),
+        ));
+      const isFirstBooking = existingBookings.length === 0;
+
+      // Comment is required for the first booking
+      if (isFirstBooking && !comment?.trim()) {
+        return res.status(400).json({
+          message: "Для первого занятия обязательно укажите комментарий — преподавателю важно понять ваш запрос.",
+        });
       }
 
       // Find an active paid subscription matching the booking type with remaining lessons
@@ -591,6 +609,7 @@ export function registerAuthRoutes(app: Express) {
         isPaid: true,
         paymentMethod: "subscription",
         roomId: randomUUID(),
+        comment: comment?.trim() || null,
       }).returning();
 
       // Deduct one lesson from the subscription

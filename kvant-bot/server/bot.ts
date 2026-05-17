@@ -605,8 +605,25 @@ export function startBot() {
       if (user && user.firstName && user.lastName && user.phone) {
         const state = getState(chatId)!;
         state.data.userId = user.id;
-        state.step = "confirm_booking";
-        await sendBookingConfirmation(bot, chatId, state.data, user);
+        const allBookings = await storage.getAllBookings();
+        const userBookings = allBookings.filter(b => b.userId === user.id && b.status !== "cancelled");
+        const isFirstBooking = userBookings.length === 0;
+        state.data.isFirstBooking = isFirstBooking;
+        state.step = "collect_booking_comment";
+        await bot.sendMessage(chatId,
+          isFirstBooking
+            ? "Это будет твоё первое занятие! 🎉\n\nРасскажи кратко о своих целях — это поможет Кириллу подготовиться:"
+            : "Есть пожелания или вопросы к занятию?\n\nНапиши комментарий или пропусти этот шаг:",
+          {
+            reply_markup: {
+              keyboard: [
+                ...(isFirstBooking ? [] : [[{ text: "Пропустить →" }]]),
+                [{ text: "❌ Отмена" }],
+              ],
+              resize_keyboard: true,
+            },
+          }
+        );
       } else {
         await bot.sendMessage(chatId,
           "Отлично! Теперь мне нужно немного информации о тебе.\n\nВведи свое имя:",
@@ -651,8 +668,25 @@ export function startBot() {
       if (user && user.firstName && user.lastName && user.phone) {
         const state = getState(chatId)!;
         state.data.userId = user.id;
-        state.step = "confirm_booking";
-        await sendBookingConfirmation(bot, chatId, state.data, user);
+        const allBookings = await storage.getAllBookings();
+        const userBookings = allBookings.filter(b => b.userId === user.id && b.status !== "cancelled");
+        const isFirstBooking = userBookings.length === 0;
+        state.data.isFirstBooking = isFirstBooking;
+        state.step = "collect_booking_comment";
+        await bot.sendMessage(chatId,
+          isFirstBooking
+            ? "Это будет твоё первое занятие! 🎉\n\nРасскажи кратко о своих целях — это поможет Кириллу подготовиться:"
+            : "Есть пожелания или вопросы к занятию?\n\nНапиши комментарий или пропусти этот шаг:",
+          {
+            reply_markup: {
+              keyboard: [
+                ...(isFirstBooking ? [] : [[{ text: "Пропустить →" }]]),
+                [{ text: "❌ Отмена" }],
+              ],
+              resize_keyboard: true,
+            },
+          }
+        );
       } else {
         await bot.sendMessage(chatId,
           "Отлично! Теперь мне нужно немного информации о тебе.\n\nВведи свое имя:",
@@ -895,10 +929,11 @@ export function startBot() {
       if (user) {
         await storage.updateUser(user.id, { phone: state.data.phone });
       }
-      state.step = "collect_comments";
+      state.data.isFirstBooking = true;
+      state.step = "collect_booking_comment";
       await bot.sendMessage(chatId,
-        "Если у тебя есть дополнительные пожелания или комментарии, напиши их сейчас.\n\nИли нажми кнопку ниже, чтобы пропустить:",
-        { reply_markup: { keyboard: [[{ text: "Пропустить →" }], [{ text: "❌ Отмена" }]], resize_keyboard: true } }
+        "Это будет твоё первое занятие! 🎉\n\nРасскажи кратко о своих целях — это поможет Кириллу подготовиться:",
+        { reply_markup: { keyboard: [[{ text: "❌ Отмена" }]], resize_keyboard: true } }
       );
     }
   });
@@ -985,12 +1020,18 @@ async function handleStateInput(bot: TelegramBot, chatId: number, text: string, 
       }
       break;
     }
-    case "collect_comments": {
+    case "collect_booking_comment": {
       const isSkip = text === "/skip" || text === "Пропустить →";
-      state.data.comments = isSkip ? null : text;
+      if (state.data.isFirstBooking && isSkip) {
+        await bot.sendMessage(chatId,
+          "Для первого занятия комментарий обязателен — Кирилл должен понять твой запрос.\n\nПожалуйста, напиши несколько слов о своих целях:",
+          { reply_markup: { keyboard: [[{ text: "❌ Отмена" }]], resize_keyboard: true } }
+        );
+        break;
+      }
+      state.data.bookingComment = isSkip ? null : text;
 
       let user = await storage.getUserByTelegramId(chatId);
-      // Fallback: if already have userId in state, use it
       if (!user && state.data.userId) {
         user = await storage.getUser(state.data.userId);
       }
@@ -1160,8 +1201,7 @@ async function sendScheduleSlotSelection(bot: TelegramBot, chatId: number) {
   const calKeyboard = buildCalendarKeyboard(availableDays, specificDates, "cal_grp", undefined, undefined, fullyBookedDates);
 
   await bot.sendMessage(chatId,
-    `${pe("👥")} Услуги и оплата\n\nВыбери интересующую услугу:`,
-    ` Выбери дату группового занятия:`,
+    `Выбери дату группового занятия:`,
     { parse_mode: "HTML", reply_markup: calKeyboard }
   );
 }
@@ -1216,6 +1256,7 @@ async function sendBookingConfirmation(bot: TelegramBot, chatId: number, data: R
   const bookingDate = data.specificDate || getNextDateForDay(data.dayOfWeek);
   const dayText = DAYS_RU[data.dayOfWeek];
 
+  const commentLine = data.bookingComment ? `\n💬 ${data.bookingComment}` : "";
   await bot.sendMessage(chatId,
     `📋 Проверь данные записи:\n\n` +
     `📚 Тип занятия: ${typeText}\n` +
@@ -1223,6 +1264,7 @@ async function sendBookingConfirmation(bot: TelegramBot, chatId: number, data: R
     `⏰ Время: ${data.time}\n\n` +
     `👤 ${user.firstName || ""} ${user.lastName || ""}\n` +
     (user.phone ? `📱 ${user.phone}\n` : "") +
+    commentLine +
     `\nВсе верно?`,
     {
       reply_markup: {
@@ -1306,6 +1348,7 @@ async function finalizeBooking(bot: TelegramBot, chatId: number, data: Record<st
     isPaid: false,
     groupScheduleId: data.groupScheduleId || null,
     roomId: randomUUID(),
+    comment: data.bookingComment || null,
   });
 
   const typeText = data.type === "individual" ? "Индивидуальное" : "Групповое";
@@ -1322,12 +1365,14 @@ async function finalizeBooking(bot: TelegramBot, chatId: number, data: Record<st
 
   if (adminChatId) {
     const name = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Без имени";
+    const commentLine = booking.comment ? `💬 ${booking.comment}\n` : "";
     const adminText =
       `📝 Новая запись!\n\n` +
       `👤 ${name} (@${user.telegramUsername || "нет username"})\n` +
       `📱 ${user.phone || "телефон не указан"}\n` +
       `📚 ${typeText} занятие\n` +
       `📅 ${bookingDate} в ${data.time}\n` +
+      commentLine +
       `🆔 Запись #${booking.id}`;
     await bot.sendMessage(parseInt(adminChatId), adminText, {
       reply_markup: {
