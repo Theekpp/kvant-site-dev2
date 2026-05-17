@@ -96,7 +96,32 @@ export function log(message: string, source = "bot") {
   });
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      log(`Port ${port} in use, retrying in 2s...`);
+      setTimeout(() => {
+        httpServer.close();
+        httpServer.listen({ port, host: "0.0.0.0" }, () => {
+          log(`Health check server on port ${port}`);
+        });
+      }, 2000);
+    } else {
+      console.error("HTTP server error:", err);
+      process.exit(1);
+    }
+  });
+
+  process.on("SIGTERM", () => {
+    log("SIGTERM received, shutting down...");
+    httpServer.close(() => {
+      log("HTTP server closed");
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 3000);
+  });
+
+  httpServer.listen({ port, host: "0.0.0.0" }, () => {
     log(`Health check server on port ${port}`);
   });
 })();

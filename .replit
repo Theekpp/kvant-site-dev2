@@ -30,7 +30,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd kvant-bot && pnpm install --no-frozen-lockfile --prefer-offline && PORT=8099 NODE_ENV=development node_modules/.bin/tsx server/index.ts"
+args = "fuser -k 8099/tcp 2>/dev/null; sleep 1; cd kvant-bot && pnpm install --no-frozen-lockfile --prefer-offline && PORT=8099 NODE_ENV=development node_modules/.bin/tsx server/index.ts"
 waitForPort = 8099
 
 [[workflows.workflow]]
@@ -125,8 +125,8 @@ localPort = 8082
 externalPort = 3001
 
 [[ports]]
-localPort = 8099
-externalPort = 8099
+localPort = 8083
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
