@@ -702,9 +702,11 @@ export default function HomeBlueAccent() {
 
               {/* CTA Button in About Section */}
               <div className="pt-4">
-                <Button className="bg-slate-100 hover:bg-indigo-50 text-[#4F46E5] border border-indigo-200 px-8 py-6 h-auto text-lg rounded-xl transition-all hover:scale-[1.02] shadow-sm">
-                  Узнать подробнее о методике <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
+                <a href="/metodika">
+                  <Button className="bg-slate-100 hover:bg-indigo-50 text-[#4F46E5] border border-indigo-200 px-8 py-6 h-auto text-lg rounded-xl transition-all hover:scale-[1.02] shadow-sm">
+                    Узнать подробнее о методике <ArrowRight className="ml-2 w-5 h-5" />
+                  </Button>
+                </a>
               </div>
             </div>
           </div>

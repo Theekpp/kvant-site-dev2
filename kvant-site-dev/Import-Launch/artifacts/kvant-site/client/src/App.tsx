@@ -13,6 +13,7 @@ import Cabinet from "@/pages/Cabinet";
 import Board from "@/pages/Board";
 import VideoRoom from "@/pages/VideoRoom";
 import Offer from "@/pages/legal/Offer";
+import Metodika from "@/pages/Metodika";
 import Privacy from "@/pages/legal/Privacy";
 import Terms from "@/pages/legal/Terms";
 import Refund from "@/pages/legal/Refund";
@@ -33,6 +34,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/privacy": "Политика конфиденциальности — Физика с Кириллом",
   "/terms": "Условия использования — Физика с Кириллом",
   "/refund": "Политика возврата — Физика с Кириллом",
+  "/metodika": "Как устроены занятия и почему это работает — Физика с Кириллом",
 };
 
 function TitleManager() {
@@ -60,6 +62,7 @@ function Router() {
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/metodika" component={Metodika} />
       <Route path="/offer" component={Offer} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
