@@ -521,6 +521,17 @@ export function registerAuthRoutes(app: Express) {
         })
         .where(eq(accounts.id, req.accountId!))
         .returning();
+
+      // Sync to linked users record so admin panel stays up-to-date
+      if (account?.userId) {
+        const updateFields: Record<string, unknown> = {};
+        if (firstName !== undefined) updateFields.firstName = firstName;
+        if (phone !== undefined) updateFields.phone = phone;
+        if (Object.keys(updateFields).length > 0) {
+          await db.update(users).set(updateFields).where(eq(users.id, account.userId));
+        }
+      }
+
       return res.json(account);
     } catch {
       return res.status(500).json({ message: "Ошибка сервера" });
