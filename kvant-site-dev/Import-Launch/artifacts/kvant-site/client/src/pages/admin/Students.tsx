@@ -739,11 +739,14 @@ export default function Students() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col text-sm">
+                      <div className="flex flex-col text-sm gap-0.5">
+                        {user.accountEmail && (
+                          <a href={`mailto:${user.accountEmail}`} className="text-blue-600 hover:underline text-xs" onClick={e => e.stopPropagation()}>{user.accountEmail}</a>
+                        )}
                         {user.phone ? (
                           <a href={`tel:${user.phone}`} className="text-primary hover:underline" onClick={e => e.stopPropagation()}>{user.phone}</a>
                         ) : (
-                          <span className="text-muted-foreground">Нет телефона</span>
+                          !user.accountEmail && <span className="text-muted-foreground">Нет телефона</span>
                         )}
                         {user.telegramUsername && (
                           <a href={`https://t.me/${user.telegramUsername}`} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" onClick={e => e.stopPropagation()}>

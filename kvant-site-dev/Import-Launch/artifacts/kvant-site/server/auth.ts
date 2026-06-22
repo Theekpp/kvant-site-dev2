@@ -163,6 +163,16 @@ export function registerAuthRoutes(app: Express) {
         if (matchingUser) userId = matchingUser.id;
       }
 
+      // If no matching users entry found by phone, create one so the account
+      // appears in the admin students list immediately after registration.
+      if (!userId) {
+        const [newUser] = await db.insert(users).values({
+          firstName: firstName || null,
+          phone: phone || null,
+        }).returning();
+        userId = newUser.id;
+      }
+
       const [account] = await db.insert(accounts).values({
         email: email.toLowerCase(),
         passwordHash,

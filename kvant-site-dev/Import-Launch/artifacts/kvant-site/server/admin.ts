@@ -51,7 +51,26 @@ export function registerAdminRoutes(app: Express) {
 
   app.get("/api/admin/users", ...guard, async (req, res) => {
     try {
-      const all = await db.select().from(users).orderBy(desc(users.createdAt));
+      const all = await db
+        .select({
+          id: users.id,
+          telegramId: users.telegramId,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          age: users.age,
+          grade: users.grade,
+          goal: users.goal,
+          phone: users.phone,
+          telegramUsername: users.telegramUsername,
+          name: users.name,
+          boardRoomId: users.boardRoomId,
+          createdAt: users.createdAt,
+          accountEmail: accounts.email,
+          accountRole: accounts.role,
+        })
+        .from(users)
+        .leftJoin(accounts, eq(accounts.userId, users.id))
+        .orderBy(desc(users.createdAt));
       res.json(all);
     } catch {
       res.status(500).json({ message: "Ошибка сервера" });
