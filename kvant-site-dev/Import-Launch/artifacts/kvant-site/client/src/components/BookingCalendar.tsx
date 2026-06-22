@@ -300,6 +300,10 @@ export function BookingCalendar({
         role="grid"
         aria-label={`Расписание занятий, ${formatWeekRange(weekStart)}`}
       >
+        {/* Shared horizontal scroll container — keeps header & body aligned */}
+        <div className="overflow-x-auto">
+          <div style={{ minWidth: `${56 + viewMode * 80}px` }}>
+
         {/* Header row */}
         <div
           className="grid border-b border-slate-200 bg-slate-50/60"
@@ -349,12 +353,11 @@ export function BookingCalendar({
         </div>
 
         {/* Time grid body */}
-        <div className="overflow-x-auto">
           <div
             className="relative"
             style={{
               display: "grid",
-              gridTemplateColumns: `56px repeat(${viewMode}, minmax(${viewMode === 1 ? "0" : "80px"}, 1fr))`,
+              gridTemplateColumns: `56px repeat(${viewMode}, minmax(0, 1fr))`,
               height: `${totalGridHeight}px`,
             }}
           >
@@ -379,7 +382,7 @@ export function BookingCalendar({
               const now = new Date();
               const dateStr = formatDateDDMMYYYY(date);
               const daySlots = slotsByDay[realDayIdx] || [];
-              const dow = date.getDay();
+              const dow = getDayOfWeekMon(date);
               const dayLabel = `${DAY_NAMES_FULL[dow]}, ${date.getDate()} ${MONTHS_RU[date.getMonth()]}`;
               return (
                 <div
@@ -458,7 +461,8 @@ export function BookingCalendar({
               );
             })}
           </div>
-        </div>
+          </div>{/* end min-width wrapper */}
+        </div>{/* end overflow-x-auto */}
 
         {totalSlotsThisWeek === 0 && (
           <div className="border-t border-slate-100 px-6 py-8 text-center">
