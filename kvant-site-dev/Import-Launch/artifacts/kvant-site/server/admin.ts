@@ -103,6 +103,22 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/admin/users/:id", ...guard, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { customConferenceUrl } = req.body;
+      const [updated] = await db.update(users)
+        .set({ customConferenceUrl: customConferenceUrl || null })
+        .where(eq(users.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Пользователь не найден" });
+      await logAction(getAdminEmail(req), "update_user_conference", "user", id, { customConferenceUrl });
+      res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
   app.get("/api/admin/users/:id/details", ...guard, async (req, res) => {
     try {
       const id = Number(req.params.id);

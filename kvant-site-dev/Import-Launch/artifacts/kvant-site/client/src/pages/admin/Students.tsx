@@ -1,4 +1,5 @@
 import { useState } from "react";
+import api from "@/lib/api";
 import {
   useGetUsers, useCreateUser, useGetUserDetails, useGetStudentProfile, useUpdateStudentProfile,
   useGetStudentHomework, useCreateHomework, useUpdateHomework, useDeleteHomework,
@@ -40,6 +41,82 @@ const DEFAULT_FORM: StudentForm = {
   firstName: "", lastName: "", age: "", grade: "", goal: "",
   phone: "", telegramUsername: "", telegramId: ""
 };
+
+function ConferenceUrlEditor({ userId, initialUrl }: { userId: number; initialUrl?: string | null }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [url, setUrl] = useState(initialUrl || "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/api/admin/users/${userId}`, { customConferenceUrl: url });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users", userId, "details"] });
+      setEditing(false);
+      toast({ title: "Ссылка конференции обновлена" });
+    } catch {
+      toast({ title: "Ошибка сохранения", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClear = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/api/admin/users/${userId}`, { customConferenceUrl: "" });
+      setUrl("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users", userId, "details"] });
+      setEditing(false);
+      toast({ title: "Ссылка конференции удалена" });
+    } catch {
+      toast({ title: "Ошибка", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="text-sm">
+      {!editing ? (
+        <div className="flex items-center gap-2">
+          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+          {initialUrl ? (
+            <a href={initialUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate flex-1">{initialUrl}</a>
+          ) : (
+            <span className="text-muted-foreground flex-1">Ссылка конференции не задана</span>
+          )}
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs shrink-0" onClick={() => { setUrl(initialUrl || ""); setEditing(true); }}>
+            {initialUrl ? "Изменить" : "Задать"}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1">
+          <Input
+            autoFocus
+            placeholder="https://zoom.us/j/..."
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            className="h-7 text-xs flex-1"
+          />
+          <Button size="sm" variant="default" className="h-7 px-2 text-xs shrink-0" onClick={handleSave} disabled={saving}>
+            Сохр.
+          </Button>
+          {initialUrl && (
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-red-500 shrink-0" onClick={handleClear} disabled={saving}>
+              Удалить
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={() => setEditing(false)}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StudentCard({ userId, onClose }: { userId: number; onClose: () => void }) {
   const { data, isLoading } = useGetUserDetails(userId);
@@ -124,6 +201,7 @@ function StudentCard({ userId, onClose }: { userId: number; onClose: () => void 
             </a>
           </div>
         )}
+        <ConferenceUrlEditor userId={user.id} initialUrl={user.customConferenceUrl} />
         {lastBotActivity && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="h-4 w-4" />

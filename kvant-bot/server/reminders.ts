@@ -47,7 +47,7 @@ export function setupReminders(bot: TelegramBot) {
         if (!user?.telegramId) continue;
 
         const boardLink = boardLinkFor(user.boardRoomId);
-        const videoLink = videoLinkFor(booking.id, conferenceOverride);
+        const videoLink = videoLinkFor(booking.id, user.customConferenceUrl || conferenceOverride);
         const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
 
         try {
@@ -143,7 +143,7 @@ export function setupReminders(bot: TelegramBot) {
         if (diffMin >= 0 && diffMin < 15 && !booking.tenMinReminded) {
           await storage.markTenMinReminded(booking.id);
           const boardLink = boardLinkFor(user?.boardRoomId);
-          const videoLink = videoLinkFor(booking.id, conferenceOverride);
+          const videoLink = videoLinkFor(booking.id, user?.customConferenceUrl || conferenceOverride);
           const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
 
           if (user?.telegramId) {
