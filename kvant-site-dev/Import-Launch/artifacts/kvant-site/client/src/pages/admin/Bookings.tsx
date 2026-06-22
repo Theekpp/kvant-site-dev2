@@ -452,12 +452,15 @@ export default function Bookings() {
               </div>
               <div>
                 <Label className="text-sm mb-1.5 block">Время *</Label>
-                <Select value={form.time} onValueChange={v => setForm(f => ({ ...f, time: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TIME_PRESETS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Input
+                  type="time"
+                  value={form.time}
+                  onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
+                  list="time-presets"
+                />
+                <datalist id="time-presets">
+                  {TIME_PRESETS.map(t => <option key={t} value={t} />)}
+                </datalist>
               </div>
             </div>
             <div>
