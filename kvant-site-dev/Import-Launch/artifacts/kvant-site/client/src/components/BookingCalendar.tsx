@@ -8,6 +8,7 @@ import {
   formatWeekRange,
   parseTimeHHMM,
   getBrowserTimezoneLabel,
+  getDayOfWeekMon,
 } from "@/lib/date-utils";
 
 export interface BookingScheduleSlot {
@@ -315,7 +316,7 @@ export function BookingCalendar({
           {visibleDays.map((date, idx) => {
             const isToday = date.getTime() === today.getTime();
             const isPast = date.getTime() < today.getTime();
-            const dow = date.getDay();
+            const dow = getDayOfWeekMon(date);
             const fullLabel = `${DAY_NAMES_FULL[dow]}, ${date.getDate()} ${MONTHS_RU[date.getMonth()]}`;
             return (
               <div
