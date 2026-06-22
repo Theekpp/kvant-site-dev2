@@ -132,8 +132,8 @@ export function setupReminders(bot: TelegramBot) {
           }
         }
 
-        // ── 10-minute reminder (window: 5–15 min) — with board + conference links ──
-        if (diffMin >= 5 && diffMin < 15 && !booking.tenMinReminded) {
+        // ── 10-minute reminder (window: 0–15 min) — with board + conference links ──
+        if (diffMin >= 0 && diffMin < 15 && !booking.tenMinReminded) {
           await storage.markTenMinReminded(booking.id);
           const boardLink = boardLinkFor(user?.boardRoomId);
           const videoLink = videoLinkFor(booking.id);
