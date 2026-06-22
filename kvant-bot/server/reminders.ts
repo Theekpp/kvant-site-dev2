@@ -45,7 +45,7 @@ export function setupReminders(bot: TelegramBot) {
         const user = booking.user;
         if (!user?.telegramId) continue;
 
-        const boardLink = boardLinkFor(booking.roomId);
+        const boardLink = boardLinkFor(user.boardRoomId);
         const videoLink = videoLinkFor(booking.id);
         const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
 
@@ -138,7 +138,7 @@ export function setupReminders(bot: TelegramBot) {
         // ── 10-minute reminder (window: 5–15 min) — with board + conference links ──
         if (diffMin >= 5 && diffMin < 15 && !tenMinRemindedIds.has(booking.id)) {
           tenMinRemindedIds.add(booking.id);
-          const boardLink = boardLinkFor(booking.roomId);
+          const boardLink = boardLinkFor(user?.boardRoomId);
           const videoLink = videoLinkFor(booking.id);
           const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
 
