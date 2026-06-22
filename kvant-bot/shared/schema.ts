@@ -117,6 +117,12 @@ export const emailTokens = pgTable("email_tokens", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertScheduleSlotSchema = createInsertSchema(scheduleSlots).omit({ id: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true });
