@@ -9,7 +9,8 @@ import {
   Banknote,
   Star,
   History,
-  Video
+  Video,
+  Settings
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ const navItems = [
   { title: "Отзывы",      url: "/admin/reviews",       icon: Star },
   { title: "История",     url: "/admin/history",       icon: History },
   { title: "Видеозаписи", url: "/admin/recordings",    icon: Video },
+  { title: "Настройки",  url: "/admin/settings",      icon: Settings },
 ];
 
 export function AppSidebar() {

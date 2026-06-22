@@ -1,6 +1,6 @@
 import type { Express, Request } from "express";
 import { db } from "./db";
-import { users, accounts, bookings, subscriptions, scheduleSlots, reviews, adminActions, botActivity, payments, studentProfiles, homeworkAssignments, homeworkSubmissions, lessonJournalEntries, studentMaterials, roadmapTopics } from "@shared/schema";
+import { users, accounts, bookings, subscriptions, scheduleSlots, reviews, adminActions, botActivity, payments, studentProfiles, homeworkAssignments, homeworkSubmissions, lessonJournalEntries, studentMaterials, roadmapTopics, siteSettings } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, ne, isNotNull, count } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "./auth";
 
@@ -906,6 +906,33 @@ export function registerAdminRoutes(app: Express) {
       await db.delete(roadmapTopics).where(eq(roadmapTopics.id, id));
       await logAction(getAdminEmail(req), "delete_roadmap_topic", "roadmap", id, {});
       return res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  // ─── SETTINGS ─────────────────────────────────────────────────────────────
+
+  app.get("/api/admin/settings", ...guard, async (req, res) => {
+    try {
+      const rows = await db.select().from(siteSettings);
+      const result: Record<string, string | null> = {};
+      for (const row of rows) result[row.key] = row.value;
+      res.json(result);
+    } catch {
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  });
+
+  app.put("/api/admin/settings", ...guard, async (req, res) => {
+    try {
+      const { key, value } = req.body as { key: string; value: string | null };
+      if (!key) return res.status(400).json({ message: "Не указан ключ" });
+      await db.insert(siteSettings)
+        .values({ key, value: value || null, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: siteSettings.key, set: { value: value || null, updatedAt: new Date() } });
+      await logAction(getAdminEmail(req), "update_setting", "settings", 0, { key, value });
+      res.json({ ok: true });
     } catch {
       res.status(500).json({ message: "Ошибка сервера" });
     }

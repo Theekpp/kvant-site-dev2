@@ -89,6 +89,12 @@ export const payments = pgTable("payments", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+export const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 export const scheduleSlots = pgTable("schedule_slots", {
   id: serial("id").primaryKey(),
   dayOfWeek: integer("day_of_week"),

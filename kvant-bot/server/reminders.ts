@@ -9,7 +9,8 @@ function boardLinkFor(roomId: string | null | undefined): string {
   return `${SITE_URL.replace(/\/$/, "")}/board/${roomId}`;
 }
 
-function videoLinkFor(bookingId: number): string {
+function videoLinkFor(bookingId: number, overrideUrl?: string | null): string {
+  if (overrideUrl) return overrideUrl;
   return `${SITE_URL.replace(/\/$/, "")}/video/booking-${bookingId}`;
 }
 
@@ -29,7 +30,10 @@ export function setupReminders(bot: TelegramBot) {
   // ─── DAILY AT 10:00: tomorrow's lesson reminder ───────────────────────────
   cron.schedule("0 10 * * *", async () => {
     try {
-      const bookings = await storage.getAllBookings();
+      const [bookings, conferenceOverride] = await Promise.all([
+        storage.getAllBookings(),
+        storage.getSetting("conference_override_url"),
+      ]);
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = toDateStr(tomorrow);
@@ -43,7 +47,7 @@ export function setupReminders(bot: TelegramBot) {
         if (!user?.telegramId) continue;
 
         const boardLink = boardLinkFor(user.boardRoomId);
-        const videoLink = videoLinkFor(booking.id);
+        const videoLink = videoLinkFor(booking.id, conferenceOverride);
         const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
 
         try {
@@ -86,7 +90,10 @@ export function setupReminders(bot: TelegramBot) {
   // ─── EVERY MINUTE: 2-hour and 10-minute reminders ─────────────────────────
   cron.schedule("* * * * *", async () => {
     try {
-      const bookings = await storage.getAllBookings();
+      const [bookings, conferenceOverride] = await Promise.all([
+        storage.getAllBookings(),
+        storage.getSetting("conference_override_url"),
+      ]);
       const now = new Date();
 
       for (const booking of bookings) {
@@ -136,7 +143,7 @@ export function setupReminders(bot: TelegramBot) {
         if (diffMin >= 0 && diffMin < 15 && !booking.tenMinReminded) {
           await storage.markTenMinReminded(booking.id);
           const boardLink = boardLinkFor(user?.boardRoomId);
-          const videoLink = videoLinkFor(booking.id);
+          const videoLink = videoLinkFor(booking.id, conferenceOverride);
           const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
 
           if (user?.telegramId) {

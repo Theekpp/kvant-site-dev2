@@ -1,5 +1,5 @@
 import {
-  users, bookings, scheduleSlots, subscriptions, studentProfiles,
+  users, bookings, scheduleSlots, subscriptions, studentProfiles, siteSettings,
   type User, type InsertUser,
   type Booking, type InsertBooking,
   type ScheduleSlot, type InsertScheduleSlot,
@@ -40,6 +40,7 @@ export interface IStorage {
   getAllSubscriptions(): Promise<Subscription[]>;
 
   getStudentProfile(userId: number): Promise<StudentProfile | undefined>;
+  getSetting(key: string): Promise<string | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -185,6 +186,11 @@ export class DatabaseStorage implements IStorage {
   async getStudentProfile(userId: number): Promise<StudentProfile | undefined> {
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.userId, userId));
     return profile || undefined;
+  }
+
+  async getSetting(key: string): Promise<string | null> {
+    const [row] = await db.select().from(siteSettings).where(eq(siteSettings.key, key));
+    return row?.value ?? null;
   }
 }
 
