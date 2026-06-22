@@ -34,7 +34,7 @@ const registerSchema = z.object({
   email: z.string().email("Неверный формат email"),
   password: z.string().min(8, "Минимум 8 символов"),
   firstName: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z.string().min(1, "Введите номер телефона"),
 });
 
 const loginSchema = z.object({

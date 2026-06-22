@@ -8,7 +8,7 @@ import api from "@/lib/api";
 const schema = z.object({
   firstName: z.string().min(1, "Введите имя"),
   email: z.string().email("Введите корректный email"),
-  phone: z.string().optional(),
+  phone: z.string().min(1, "Введите номер телефона"),
   password: z.string().min(8, "Минимум 8 символов"),
   confirmPassword: z.string(),
   consent: z.boolean().refine(v => v === true, "Необходимо дать согласие"),
@@ -36,7 +36,7 @@ export default function Register() {
         email: data.email,
         password: data.password,
         firstName: data.firstName,
-        phone: data.phone || undefined,
+        phone: data.phone,
       });
       setSuccess(true);
     } catch (err: any) {
@@ -102,15 +102,14 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Телефон <span className="text-muted-foreground font-normal">(необязательно)</span>
-              </label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Телефон</label>
               <input
                 {...register("phone")}
                 type="tel"
                 placeholder="+7 999 000-00-00"
                 className="w-full px-4 py-2.5 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition"
               />
+              {errors.phone && <p className="text-destructive text-xs mt-1">{errors.phone.message}</p>}
             </div>
 
             <div>
