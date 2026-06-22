@@ -22,6 +22,8 @@ export interface IStorage {
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(id: number, status: string): Promise<Booking>;
   updateBookingPaid(id: number, isPaid: boolean): Promise<Booking>;
+  markTwoHourReminded(id: number): Promise<void>;
+  markTenMinReminded(id: number): Promise<void>;
 
   getScheduleSlots(): Promise<ScheduleSlot[]>;
   getScheduleByType(slotType: string): Promise<ScheduleSlot[]>;
@@ -96,6 +98,14 @@ export class DatabaseStorage implements IStorage {
   async updateBookingPaid(id: number, isPaid: boolean): Promise<Booking> {
     const [b] = await db.update(bookings).set({ isPaid }).where(eq(bookings.id, id)).returning();
     return b;
+  }
+
+  async markTwoHourReminded(id: number): Promise<void> {
+    await db.update(bookings).set({ twoHourReminded: true }).where(eq(bookings.id, id));
+  }
+
+  async markTenMinReminded(id: number): Promise<void> {
+    await db.update(bookings).set({ tenMinReminded: true }).where(eq(bookings.id, id));
   }
 
   async getScheduleSlots(): Promise<ScheduleSlot[]> {

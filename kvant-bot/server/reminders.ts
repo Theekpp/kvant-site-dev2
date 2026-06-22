@@ -23,9 +23,6 @@ function parseBookingDateTime(date: string, time: string): Date | null {
 function padDate(n: number) { return String(n).padStart(2, "0"); }
 function toDateStr(d: Date) { return `${padDate(d.getDate())}.${padDate(d.getMonth() + 1)}.${d.getFullYear()}`; }
 
-const twoHourRemindedIds = new Set<number>();
-const tenMinRemindedIds = new Set<number>();
-
 export function setupReminders(bot: TelegramBot) {
   const adminChatId = process.env.ADMIN_CHAT_ID;
 
@@ -101,8 +98,8 @@ export function setupReminders(bot: TelegramBot) {
         const user = booking.user;
 
         // ── 2-hour reminder (window: 115–125 min) ──
-        if (diffMin >= 115 && diffMin < 125 && !twoHourRemindedIds.has(booking.id)) {
-          twoHourRemindedIds.add(booking.id);
+        if (diffMin >= 115 && diffMin < 125 && !booking.twoHourReminded) {
+          await storage.markTwoHourReminded(booking.id);
           const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";
 
           if (user?.telegramId) {
@@ -136,8 +133,8 @@ export function setupReminders(bot: TelegramBot) {
         }
 
         // ── 10-minute reminder (window: 5–15 min) — with board + conference links ──
-        if (diffMin >= 5 && diffMin < 15 && !tenMinRemindedIds.has(booking.id)) {
-          tenMinRemindedIds.add(booking.id);
+        if (diffMin >= 5 && diffMin < 15 && !booking.tenMinReminded) {
+          await storage.markTenMinReminded(booking.id);
           const boardLink = boardLinkFor(user?.boardRoomId);
           const videoLink = videoLinkFor(booking.id);
           const typeText = booking.type === "individual" ? "индивидуальное" : "групповое";

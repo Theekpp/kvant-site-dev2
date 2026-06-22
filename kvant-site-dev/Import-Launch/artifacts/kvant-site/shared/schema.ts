@@ -59,6 +59,8 @@ export const bookings = pgTable("bookings", {
   groupScheduleId: integer("group_schedule_id"),
   roomId: text("room_id").unique(),
   comment: text("comment"),
+  twoHourReminded: boolean("two_hour_reminded").notNull().default(false),
+  tenMinReminded: boolean("ten_min_reminded").notNull().default(false),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
